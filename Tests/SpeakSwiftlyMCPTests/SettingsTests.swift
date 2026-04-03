@@ -10,16 +10,15 @@ func settingsNormalizeRelativePathsAndRoutePrefix() {
         [
             "SPEAK_TO_USER_MCP_PORT": "7450",
             "SPEAK_TO_USER_MCP_MCP_PATH": "mcp",
-            "SPEAK_TO_USER_MCP_SPEAKSWIFTLY_RUNTIME_PATH": "./runtime",
-            "SPEAK_TO_USER_MCP_XCODE_DERIVED_DATA_PATH": "./.local/xcode/derived-data",
+            "SPEAK_TO_USER_MCP_SPEAKSWIFTLY_SOURCE_PATH": "./SpeakSwiftly",
+            "SPEAK_TO_USER_MCP_LOG_DIRECTORY": "./.local/logs",
         ]
     )
 
     #expect(settings.port == 7450)
     #expect(settings.mcpPath == "/mcp")
-    #expect(settings.speakswiftlyRuntimePath == ServerSettings.repoRoot.appendingPathComponent("runtime"))
-    #expect(settings.xcodeDerivedDataPath == ServerSettings.repoRoot.appendingPathComponent(".local/xcode/derived-data"))
-    #expect(settings.cachedBinaryPath.path.hasSuffix("/Build/Products/Debug/SpeakSwiftly"))
+    #expect(settings.speakswiftlySourcePath == ServerSettings.repoRoot.appendingPathComponent("SpeakSwiftly"))
+    #expect(settings.logDirectory == ServerSettings.repoRoot.appendingPathComponent(".local/logs"))
 }
 
 @Test

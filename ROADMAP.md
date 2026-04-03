@@ -8,15 +8,15 @@
 
 - Keep the MCP surface behavior aligned with `speak-to-user-mcp` while the Swift implementation matures.
 - Prefer simple, directly traceable data flow over speculative architecture.
-- Treat the current SpeakSwiftly worker bridge as compatibility infrastructure, not the final runtime boundary.
-- Move toward a first-class `SpeakSwiftlyCore` API in bounded steps instead of one risky rewrite.
+- Prefer the first-class `SpeakSwiftlyCore` runtime directly when it keeps the server simpler and the data flow straighter.
+- Finish cleanup work in complete passes instead of preserving transitional runtime scaffolding.
 
 ## Milestone Progress
 
 - [x] Milestone 0: Foundation bootstrap
 - [ ] Milestone 1: Runtime hardening and local ops
 - [ ] Milestone 2: App-host integration readiness
-- [ ] Milestone 3: `SpeakSwiftlyCore` v1 migration path
+- [x] Milestone 3: `SpeakSwiftlyCore` v1 migration path
 
 ## Milestone 0: Foundation bootstrap
 
@@ -31,7 +31,7 @@ Tickets:
 
 - [x] Add Swift MCP SDK, Hummingbird, ServiceLifecycle, and swift-log dependencies.
 - [x] Implement the Hummingbird-to-MCP HTTP bridge.
-- [x] Implement the current subprocess-backed SpeakSwiftly owner.
+- [x] Implement the first working SpeakSwiftly owner.
 - [x] Add tests for settings normalization and mirrored surface names.
 - [x] Add project README and roadmap.
 
@@ -45,7 +45,7 @@ Exit criteria:
 
 Scope:
 
-- [ ] Make the current bridge-backed server more robust for day-to-day local use.
+- [ ] Make the in-process `SpeakSwiftlyCore` server more robust for day-to-day local use.
 - [ ] Improve diagnostics so startup and worker failures are obvious and actionable.
 - [ ] Add stronger verification around server startup and request flow.
 
@@ -59,7 +59,7 @@ Tickets:
 Exit criteria:
 
 - [ ] A local contributor can start the server and diagnose common setup failures without reading source first.
-- [ ] The current bridge-backed runtime path feels stable enough to support app integration work.
+- [ ] The in-process runtime path feels stable enough to support app integration work.
 
 ## Milestone 2: App-host integration readiness
 
@@ -82,17 +82,17 @@ Exit criteria:
 
 Scope:
 
-- [ ] Replace the current JSONL bridge with a real first-class library API once `SpeakSwiftlyCore` exposes the right surfaces.
-- [ ] Preserve the public MCP contract while swapping the backend implementation.
+- [x] Replace the old JSONL worker bridge with the in-process `SpeakSwiftlyCore` runtime.
+- [x] Preserve the public MCP contract while swapping the backend implementation.
 
 Tickets:
 
-- [ ] Define the minimum in-process `SpeakSwiftlyCore` runtime API needed to replace the bridge.
-- [ ] Add explicit event and result delivery APIs that do not depend on stdout or stderr.
-- [ ] Refactor `SpeakSwiftlyMCP` to use the in-process runtime path behind the existing MCP surface.
-- [ ] Remove obsolete subprocess-management code once the in-process path is verified.
+- [x] Define the minimum in-process `SpeakSwiftlyCore` runtime API needed to replace the bridge.
+- [x] Add explicit event and result delivery APIs that do not depend on stdout or stderr.
+- [x] Refactor `SpeakSwiftlyMCP` to use the in-process runtime path behind the existing MCP surface.
+- [x] Remove obsolete subprocess-management code once the in-process path is verified.
 
 Exit criteria:
 
-- [ ] The Swift MCP server no longer depends on a subprocess-owned SpeakSwiftly bridge.
-- [ ] The MCP surface remains compatible with the current tool, resource, and prompt contract.
+- [x] The Swift MCP server no longer depends on a subprocess-owned SpeakSwiftly bridge.
+- [x] The MCP surface remains compatible with the current tool, resource, and prompt contract.

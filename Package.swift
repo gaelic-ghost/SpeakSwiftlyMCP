@@ -12,6 +12,7 @@ let package = Package(
         .executable(name: "SpeakSwiftlyMCP", targets: ["SpeakSwiftlyMCP"]),
     ],
     dependencies: [
+        .package(path: "../SpeakSwiftly"),
         .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.10.0"),
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0"),
         .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.3.0"),
@@ -21,6 +22,7 @@ let package = Package(
         .executableTarget(
             name: "SpeakSwiftlyMCP",
             dependencies: [
+                .product(name: "SpeakSwiftlyCore", package: "SpeakSwiftly"),
                 .product(name: "MCP", package: "swift-sdk"),
                 .product(name: "Hummingbird", package: "hummingbird"),
                 .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),

@@ -21,18 +21,18 @@ SpeakSwiftlyMCP provides a Swift-native MCP host that mirrors the current `speak
 
 This package exists so SpeakSwiftly can be exposed through the same accessibility-focused MCP interface without depending on the Python server at runtime. It is also the server executable that a future macOS app can register and supervise as a LaunchAgent.
 
-Today the server still talks to `../SpeakSwiftly` through the existing JSONL worker bridge, which keeps behavior aligned with the current production MCP surface while `SpeakSwiftlyCore` evolves toward a cleaner in-process API. That bridge is intentional for now, not the long-term architecture.
+The server now links directly against `SpeakSwiftlyCore` and runs the `WorkerRuntime` in-process, which keeps the MCP surface aligned with `speak-to-user-mcp` without depending on a separate worker executable.
 
 ## Setup
 
-1. Make sure the adjacent `SpeakSwiftly` checkout exists at `../SpeakSwiftly`, or plan to point this server at an explicit runtime with environment variables.
+1. Make sure the adjacent `SpeakSwiftly` checkout exists at `../SpeakSwiftly` so SwiftPM can resolve the local package dependency.
 2. Build the server package:
 
 ```bash
 swift build
 ```
 
-3. If you want to use the default adjacent-package runtime path, build `SpeakSwiftly` too:
+3. If you want to validate the underlying library directly while iterating, build `SpeakSwiftly` too:
 
 ```bash
 cd ../SpeakSwiftly
@@ -62,10 +62,8 @@ The package is intentionally split into a small set of responsibilities:
 
 - [Main.swift](/Users/galew/Workspace/SpeakSwiftlyMCP/Sources/SpeakSwiftlyMCP/Main.swift) bootstraps logging, MCP transport, and the Hummingbird application.
 - [MCPServerFactory.swift](/Users/galew/Workspace/SpeakSwiftlyMCP/Sources/SpeakSwiftlyMCP/MCPServerFactory.swift) registers the mirrored MCP surface.
-- [SpeakSwiftlyOwner.swift](/Users/galew/Workspace/SpeakSwiftlyMCP/Sources/SpeakSwiftlyMCP/SpeakSwiftlyOwner.swift) owns the current SpeakSwiftly worker bridge, runtime resolution, playback-job tracking, and cached status state.
+- [SpeakSwiftlyOwner.swift](/Users/galew/Workspace/SpeakSwiftlyMCP/Sources/SpeakSwiftlyMCP/SpeakSwiftlyOwner.swift) owns the in-process `SpeakSwiftlyCore` runtime, playback-job tracking, and cached status state.
 - [HTTPBridge.swift](/Users/galew/Workspace/SpeakSwiftlyMCP/Sources/SpeakSwiftlyMCP/HTTPBridge.swift) adapts Hummingbird request and response types to the MCP HTTP server transport.
-
-The eventual plan is to replace the subprocess bridge with a first-class `SpeakSwiftlyCore` library API once that API is ready enough to preserve the current MCP behavior without extra shims.
 
 ## Verification
 
@@ -100,13 +98,6 @@ swift test
 swift run SpeakSwiftlyMCP
 ```
 
-- Start the server against an explicit SpeakSwiftly runtime directory:
-
-```bash
-SPEAK_TO_USER_MCP_SPEAKSWIFTLY_RUNTIME_PATH=/absolute/path/to/runtime \
-swift run SpeakSwiftlyMCP
-```
-
 ## Configuration
 
 Configuration is environment-driven and uses the `SPEAK_TO_USER_MCP_` prefix.
@@ -116,17 +107,10 @@ Common settings:
 - `SPEAK_TO_USER_MCP_HOST`
 - `SPEAK_TO_USER_MCP_PORT`
 - `SPEAK_TO_USER_MCP_MCP_PATH`
-- `SPEAK_TO_USER_MCP_SPEAKSWIFTLY_RUNTIME_PATH`
 - `SPEAK_TO_USER_MCP_SPEAKSWIFTLY_SOURCE_PATH`
 - `SPEAK_TO_USER_MCP_SPEAKSWIFTLY_PROFILE_ROOT`
 - `SPEAK_TO_USER_MCP_XCODE_BUILD_CONFIGURATION`
-- `SPEAK_TO_USER_MCP_XCODE_DERIVED_DATA_PATH`
-- `SPEAK_TO_USER_MCP_XCODE_SOURCE_PACKAGES_PATH`
-- `SPEAK_TO_USER_MCP_BUILD_METADATA_PATH`
 - `SPEAK_TO_USER_MCP_LAUNCHAGENT_LABEL`
 - `SPEAK_TO_USER_MCP_LOG_DIRECTORY`
 
-If no explicit SpeakSwiftly runtime path is set, the server currently expects either:
-
-- an Xcode-built `SpeakSwiftly` binary in the configured derived-data products path, or
-- a SwiftPM debug binary at `../SpeakSwiftly/.build/arm64-apple-macosx/debug/SpeakSwiftly`
+`SPEAK_TO_USER_MCP_SPEAKSWIFTLY_SOURCE_PATH` is used for adjacent-checkout diagnostics and defaults to `../SpeakSwiftly`.
