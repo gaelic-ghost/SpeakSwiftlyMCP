@@ -2,6 +2,44 @@ import Foundation
 import Logging
 import SpeakSwiftlyCore
 
+// MARK: - Runtime Test Seam
+
+protocol SpeakSwiftlyRuntimeClient: Sendable {
+    func runtimeStatusEvents() async -> AsyncStream<WorkerStatusEvent>
+    func runtimeSubmit(_ request: WorkerRequest) async -> RuntimeRequestHandle
+    func runtimeStart() async
+    func runtimeShutdown() async
+}
+
+struct RuntimeRequestHandle: Sendable {
+    let id: String
+    let request: WorkerRequest
+    let events: AsyncThrowingStream<WorkerRequestStreamEvent, Error>
+}
+
+extension WorkerRuntime: SpeakSwiftlyRuntimeClient {
+    func runtimeStatusEvents() async -> AsyncStream<WorkerStatusEvent> {
+        statusEvents()
+    }
+
+    func runtimeSubmit(_ request: WorkerRequest) async -> RuntimeRequestHandle {
+        let handle = await submit(request)
+        return RuntimeRequestHandle(
+            id: handle.id,
+            request: handle.request,
+            events: handle.events
+        )
+    }
+
+    func runtimeStart() async {
+        start()
+    }
+
+    func runtimeShutdown() async {
+        await shutdown()
+    }
+}
+
 // MARK: - Worker Transport Types
 
 struct WorkerLineEnvelope: Sendable {
@@ -51,8 +89,9 @@ enum SpeakSwiftlyOwnerError: LocalizedError {
 actor SpeakSwiftlyOwner {
     private let settings: ServerSettings
     private let logger: Logger
+    private let makeRuntime: @Sendable () async -> any SpeakSwiftlyRuntimeClient
 
-    private var runtime: WorkerRuntime?
+    private var runtime: (any SpeakSwiftlyRuntimeClient)?
     private var statusTask: Task<Void, Never>?
     private var profiles: [ProfileSummary] = []
     private var playbackJobsByID: [String: PlaybackJob] = [:]
@@ -65,9 +104,16 @@ actor SpeakSwiftlyOwner {
     private var lastProfileRefreshAt: Date?
     private var lastWorkerStatusStage: String?
 
-    init(settings: ServerSettings, logger: Logger) {
+    init(
+        settings: ServerSettings,
+        logger: Logger,
+        makeRuntime: @escaping @Sendable () async -> any SpeakSwiftlyRuntimeClient = {
+            await SpeakSwiftly.makeLiveRuntime()
+        }
+    ) {
         self.settings = settings
         self.logger = logger
+        self.makeRuntime = makeRuntime
     }
 
     // MARK: Lifecycle
@@ -92,10 +138,10 @@ actor SpeakSwiftlyOwner {
             )
         )
 
-        let runtime = await SpeakSwiftly.makeLiveRuntime()
+        let runtime = await makeRuntime()
         self.runtime = runtime
         startStatusObservation(for: runtime)
-        await runtime.start()
+        await runtime.runtimeStart()
 
         do {
             try await refreshProfiles()
@@ -120,7 +166,7 @@ actor SpeakSwiftlyOwner {
         statusTask = nil
 
         if let runtime {
-            await runtime.shutdown()
+            await runtime.runtimeShutdown()
         }
 
         runtime = nil
@@ -339,10 +385,10 @@ actor SpeakSwiftlyOwner {
 
     // MARK: Runtime Integration
 
-    private func startStatusObservation(for runtime: WorkerRuntime) {
+    private func startStatusObservation(for runtime: any SpeakSwiftlyRuntimeClient) {
         statusTask?.cancel()
         statusTask = Task {
-            let stream = await runtime.statusEvents()
+            let stream = await runtime.runtimeStatusEvents()
             for await status in stream {
                 self.handleStatusEvent(status)
             }
@@ -396,18 +442,18 @@ actor SpeakSwiftlyOwner {
         profileCacheWarning = nil
     }
 
-    private func submit(_ request: WorkerRequest) async throws -> WorkerRequestHandle {
+    private func submit(_ request: WorkerRequest) async throws -> RuntimeRequestHandle {
         guard let runtime else {
             throw SpeakSwiftlyOwnerError.workerUnavailable(
                 "SpeakSwiftly is not ready yet. Wait for initialization to finish or inspect the status tool for details."
             )
         }
 
-        return await runtime.submit(request)
+        return await runtime.runtimeSubmit(request)
     }
 
     private func awaitCompletion(
-        for handle: WorkerRequestHandle,
+        for handle: RuntimeRequestHandle,
         onEvent: (@Sendable (WorkerLineEnvelope) async -> Void)?
     ) async throws -> WorkerSuccessResponse {
         do {
