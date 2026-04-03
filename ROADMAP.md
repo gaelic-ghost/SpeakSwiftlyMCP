@@ -18,6 +18,7 @@
 - [ ] Milestone 2: App-host integration readiness
 - [x] Milestone 3: `SpeakSwiftlyCore` v1 migration path
 - [ ] Milestone 4: Distributed dependency adoption
+- [ ] Milestone 5: Transport and end-to-end test coverage
 
 ## Milestone 0: Foundation bootstrap
 
@@ -117,3 +118,28 @@ Exit criteria:
 
 - [ ] `SpeakSwiftlyMCP` builds from a clean checkout with only versioned external dependencies.
 - [ ] The future macOS app and the `speak-to-user` monorepo no longer need local path assumptions to adopt new `SpeakSwiftlyMCP` releases.
+
+## Milestone 5: Transport and end-to-end test coverage
+
+Scope:
+
+- [ ] Close the remaining source-level coverage gaps in the MCP transport and executable entrypoints.
+- [ ] Add end-to-end-style verification for every public tool, resource, and prompt path that matters to local operators and the future app host.
+- [ ] Keep the Swift contract visibly aligned with `SpeakSwiftlyServer` and `speak-to-user-mcp` as coverage expands.
+
+Tickets:
+
+- [ ] Add direct tests for `MCPServerFactory` so tool handlers, prompt handlers, resource handlers, and template reads are exercised through the assembled server surface instead of only through owner helpers.
+- [ ] Add direct tests for `HTTPBridge` so streamable MCP HTTP routing, health checks, and response behavior are exercised without depending on manual local runs.
+- [ ] Add targeted coverage for `Main` startup wiring so configuration loading, lifecycle startup, and failure reporting are verified at least once in an executable-style harness.
+- [ ] Add end-to-end tests that cover each public tool path: `speak_live`, `speak_live_background`, `create_profile`, `list_profiles`, `remove_profile`, and `status`.
+- [ ] Add end-to-end tests that cover each public resource path: `speak://status`, `speak://profiles`, `speak://playback-jobs`, `speak://runtime`, `speak://profiles/{profile_name}/detail`, and `speak://playback-jobs/{playback_job_id}`.
+- [ ] Add end-to-end tests that cover each public prompt path and verify their stable names plus the essential shape of their arguments and output.
+- [ ] Add negative-path coverage for transport-level failures, malformed requests, missing resources, and runtime initialization failures that propagate through the MCP server surface.
+- [ ] Document which coverage is owner-level, transport-level, and end-to-end so future releases can see the remaining risk clearly.
+
+Exit criteria:
+
+- [ ] `MCPServerFactory`, `HTTPBridge`, and `Main` no longer sit at 0% coverage.
+- [ ] Every public tool, resource, and prompt path has at least one automated end-to-end coverage path.
+- [ ] A contributor can change the MCP surface and get fast test failures if the public contract drifts from the expected Swift and Python-compatible behavior.
