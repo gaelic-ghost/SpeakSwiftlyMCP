@@ -306,7 +306,7 @@ actor SpeakSwiftlyOwner {
             buildMetadataBuiltAt: nil,
             buildMetadataSourceTreeFingerprint: nil,
             currentSourceTreeFingerprint: nil,
-            runtimeCacheState: "in_process_library",
+            runtimeCacheState: "not_applicable",
             runtimeCacheWarning: nil,
             xcodeBuildConfiguration: settings.xcodeBuildConfiguration,
             workerFailureSummary: workerFailureSummary,
