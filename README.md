@@ -76,7 +76,7 @@ swift test
 
 ## License
 
-No license file is committed yet. Until a license is added to this repository, treat the code as not licensed for reuse.
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
 ## Command Reference
 
