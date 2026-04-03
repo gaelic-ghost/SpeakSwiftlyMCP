@@ -8,15 +8,31 @@ let package = Package(
     platforms: [
         .macOS("15.0"),
     ],
+    products: [
+        .executable(name: "SpeakSwiftlyMCP", targets: ["SpeakSwiftlyMCP"]),
+    ],
+    dependencies: [
+        .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.10.0"),
+        .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0"),
+        .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.3.0"),
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.6.0"),
+    ],
     targets: [
-        // Targets are the basic building blocks of a package, defining a module or a test suite.
-        // Targets can depend on other targets in this package and products from dependencies.
         .executableTarget(
-            name: "SpeakSwiftlyMCP"
+            name: "SpeakSwiftlyMCP",
+            dependencies: [
+                .product(name: "MCP", package: "swift-sdk"),
+                .product(name: "Hummingbird", package: "hummingbird"),
+                .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
+                .product(name: "Logging", package: "swift-log"),
+            ]
         ),
         .testTarget(
             name: "SpeakSwiftlyMCPTests",
-            dependencies: ["SpeakSwiftlyMCP"]
+            dependencies: [
+                "SpeakSwiftlyMCP",
+                .product(name: "MCP", package: "swift-sdk"),
+            ]
         ),
     ],
     swiftLanguageModes: [.v6]
