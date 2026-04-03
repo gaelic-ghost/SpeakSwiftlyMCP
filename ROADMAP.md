@@ -17,6 +17,7 @@
 - [ ] Milestone 1: Runtime hardening and local ops
 - [ ] Milestone 2: App-host integration readiness
 - [x] Milestone 3: `SpeakSwiftlyCore` v1 migration path
+- [ ] Milestone 4: Distributed dependency adoption
 
 ## Milestone 0: Foundation bootstrap
 
@@ -96,3 +97,23 @@ Exit criteria:
 
 - [x] The Swift MCP server no longer depends on a subprocess-owned SpeakSwiftly bridge.
 - [x] The MCP surface remains compatible with the current tool, resource, and prompt contract.
+
+## Milestone 4: Distributed dependency adoption
+
+Scope:
+
+- [ ] Stop depending on a sibling `../SpeakSwiftly` checkout for package resolution.
+- [ ] Make `SpeakSwiftlyMCP` consumable from GitHub or a Swift package registry without local path wiring.
+
+Tickets:
+
+- [ ] Choose the distribution path for `SpeakSwiftly`: GitHub-based package dependency, package registry publication, or another stable Swift distribution channel.
+- [ ] Update `SpeakSwiftly` packaging and release flow so `SpeakSwiftlyCore` can be consumed as a versioned external dependency.
+- [ ] Replace the local path dependency in `SpeakSwiftlyMCP` with a versioned dependency once the published package is available.
+- [ ] Update setup, release, and integration docs to describe the distributed dependency flow instead of the sibling-checkout flow.
+- [ ] Verify that a clean checkout can build `SpeakSwiftlyMCP` without a local adjacent `SpeakSwiftly` repository.
+
+Exit criteria:
+
+- [ ] `SpeakSwiftlyMCP` builds from a clean checkout with only versioned external dependencies.
+- [ ] The future macOS app and the `speak-to-user` monorepo no longer need local path assumptions to adopt new `SpeakSwiftlyMCP` releases.
