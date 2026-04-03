@@ -77,6 +77,14 @@ swift build
 swift test
 ```
 
+The real `SpeakSwiftly` end-to-end suite is intentionally optional and intentionally serialized. It only runs when you opt in, it acquires an exclusive lock at `/tmp/speak-to-user-mcp-model-loading-e2e.lock`, and it launches the server executable directly instead of nesting a second `swift run` inside `swift test`. For MLX-backed coverage it uses an Xcode-built `SpeakSwiftlyMCP` product so the required `default.metallib` bundle is present.
+
+Opt into the real-server suite with:
+
+```bash
+SPEAK_TO_USER_MCP_E2E=1 swift test
+```
+
 ## MCP Surface
 
 Tool names:
