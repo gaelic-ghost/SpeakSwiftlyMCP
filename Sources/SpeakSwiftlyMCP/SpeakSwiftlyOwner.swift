@@ -67,7 +67,7 @@ private struct PlaybackJob: Hashable, Sendable {
     var errorMessage: String?
 }
 
-enum SpeakSwiftlyOwnerError: LocalizedError {
+enum SpeakSwiftlyOwnerError: LocalizedError, Sendable {
     case workerUnavailable(String)
     case requestRejected(code: String, message: String)
     case invalidWorkerOutput(String)
@@ -229,36 +229,51 @@ actor SpeakSwiftlyOwner {
         playbackJobOrder.append(playbackJobID)
         trimPlaybackJobs()
 
-        let launched = AsyncSignal()
+        let enqueueGate = AsyncResultSignal()
         let completionWatcher = Task {
             do {
                 for try await event in handle.events {
                     self.recordPlaybackEvent(event, playbackJobID: playbackJobID)
 
                     switch event {
-                    case .acknowledged, .started, .completed:
-                        await launched.fire()
+                    case .acknowledged, .completed:
+                        _ = await enqueueGate.succeed()
                     case .progress(let progress):
-                        if [
-                            WorkerProgressStage.startingPlayback,
-                            .prerollReady,
-                            .playbackFinished,
-                        ].contains(progress.stage) {
-                            await launched.fire()
+                        if progress.stage == .playbackFinished {
+                            _ = await enqueueGate.succeed()
                         }
-                    case .queued:
-                        break
+                    case .queued, .started:
+                        continue
                     }
                 }
 
                 self.completePlaybackJob(playbackJobID, errorMessage: nil)
+                _ = await enqueueGate.succeed()
+            } catch let error as WorkerError {
+                let requestError = SpeakSwiftlyOwnerError.requestRejected(
+                    code: error.code.rawValue,
+                    message: error.message
+                )
+                if await enqueueGate.fail(requestError) == false {
+                    self.completePlaybackJob(playbackJobID, errorMessage: error.message)
+                }
             } catch {
-                self.completePlaybackJob(playbackJobID, errorMessage: error.localizedDescription)
-                await launched.fire()
+                let unavailableError = SpeakSwiftlyOwnerError.workerUnavailable(
+                    "SpeakSwiftly stopped streaming request events before the background playback request could be accepted. \(error.localizedDescription)"
+                )
+                if await enqueueGate.fail(unavailableError) == false {
+                    self.completePlaybackJob(playbackJobID, errorMessage: error.localizedDescription)
+                }
             }
         }
 
-        await launched.wait()
+        do {
+            try await enqueueGate.wait()
+        } catch {
+            playbackJobsByID.removeValue(forKey: playbackJobID)
+            playbackJobOrder.removeAll { $0 == playbackJobID }
+            throw error
+        }
         _ = completionWatcher
 
         let playbackJob = playbackJobsByID[playbackJobID]
@@ -310,7 +325,7 @@ actor SpeakSwiftlyOwner {
     }
 
     func listProfiles() async throws -> ListProfilesResult {
-        try await refreshProfiles()
+        try ensureWorkerReady()
         return ListProfilesResult(id: "cached-profiles", ok: true, profiles: profiles)
     }
 
@@ -450,6 +465,15 @@ actor SpeakSwiftlyOwner {
         }
 
         return await runtime.runtimeSubmit(request)
+    }
+
+    private func ensureWorkerReady() throws {
+        guard workerMode == "ready", runtime != nil else {
+            throw SpeakSwiftlyOwnerError.workerUnavailable(
+                workerFailureSummary
+                ?? "SpeakSwiftly is not available yet. Check the status tool for the current startup state."
+            )
+        }
     }
 
     private func awaitCompletion(
@@ -674,24 +698,35 @@ actor SpeakSwiftlyOwner {
     }
 }
 
-// MARK: - Async Signal
+private actor AsyncResultSignal {
+    private var result: Result<Void, SpeakSwiftlyOwnerError>?
+    private var waiters: [CheckedContinuation<Result<Void, SpeakSwiftlyOwnerError>, Never>] = []
 
-private actor AsyncSignal {
-    private var fired = false
-    private var waiters: [CheckedContinuation<Void, Never>] = []
+    func wait() async throws {
+        if let result {
+            return try result.get()
+        }
 
-    func wait() async {
-        if fired { return }
-        await withCheckedContinuation { continuation in
+        let result = await withCheckedContinuation { continuation in
             waiters.append(continuation)
         }
+        try result.get()
     }
 
-    func fire() {
-        guard fired == false else { return }
-        fired = true
+    func succeed() -> Bool {
+        resolve(.success(()))
+    }
+
+    func fail(_ error: SpeakSwiftlyOwnerError) -> Bool {
+        resolve(.failure(error))
+    }
+
+    private func resolve(_ result: Result<Void, SpeakSwiftlyOwnerError>) -> Bool {
+        guard self.result == nil else { return false }
+        self.result = result
         let continuations = waiters
         waiters.removeAll()
-        continuations.forEach { $0.resume() }
+        continuations.forEach { $0.resume(returning: result) }
+        return true
     }
 }

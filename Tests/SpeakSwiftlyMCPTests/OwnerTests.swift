@@ -361,7 +361,79 @@ func speakLiveBackgroundMarksFailedJobsWhenStreamingBreaks() async throws {
     let job = try #require(await owner.playbackJob(result.playbackJobID))
     #expect(job.launchStage == WorkerProgressStage.startingPlayback.rawValue)
     #expect(job.playbackState == "failed")
-    #expect(job.errorMessage?.contains("SpeakSwiftlyCore.WorkerError") == true)
+    #expect(job.errorMessage == "SpeakSwiftly lost the playback device while the background job was running.")
+}
+
+@Test
+func speakLiveBackgroundRejectsPreAcceptanceFailuresAndDropsUntrackedJob() async throws {
+    let profile = SpeakSwiftlyCore.ProfileSummary(
+        profileName: "default-femme",
+        createdAt: Date(),
+        voiceDescription: "Warm narrator",
+        sourceText: "Hello there"
+    )
+    let runtime = FakeRuntime { request in
+        switch request {
+        case .listProfiles(let id):
+            return runtimeHandle(
+                id: id,
+                request: request,
+                events: [.completed(.init(id: id, profiles: [profile]))]
+            )
+        case .speakLiveBackground:
+            return runtimeThrowingHandle(
+                id: request.id,
+                request: request,
+                error: WorkerError(
+                    code: .audioPlaybackFailed,
+                    message: "SpeakSwiftly could not start playback."
+                )
+            )
+        default:
+            return runtimeHandle(id: request.id, request: request, events: [])
+        }
+    }
+    let owner = makeOwner(runtime: runtime)
+    await owner.initialize()
+
+    do {
+        _ = try await owner.speakLiveBackground(
+            text: "Hello there",
+            profileName: "default-femme"
+        )
+        Issue.record("Expected background playback to fail before queue acceptance.")
+    } catch let error as SpeakSwiftlyOwnerError {
+        #expect(error.errorDescription == "SpeakSwiftly could not start playback.")
+    }
+
+    #expect(await owner.playbackJobs().isEmpty)
+}
+
+@Test
+func listProfilesReturnsCachedSnapshotWithoutRefreshingAgain() async throws {
+    let initialProfile = SpeakSwiftlyCore.ProfileSummary(
+        profileName: "default-femme",
+        createdAt: Date(),
+        voiceDescription: "Warm narrator",
+        sourceText: "Hello there"
+    )
+    let runtime = FakeRuntime(profileSnapshots: [[initialProfile]]) { request in
+        switch request {
+        case .listProfiles:
+            Issue.record("listProfiles should return the cached snapshot without resubmitting list_profiles.")
+            return runtimeHandle(id: request.id, request: request, events: [])
+        default:
+            return runtimeHandle(id: request.id, request: request, events: [])
+        }
+    }
+    let owner = makeOwner(runtime: runtime)
+    await owner.initialize()
+
+    let result = try await owner.listProfiles()
+
+    #expect(result.ok)
+    #expect(result.profiles.count == 1)
+    #expect(result.profiles.first?.profileName == "default-femme")
 }
 
 @Test

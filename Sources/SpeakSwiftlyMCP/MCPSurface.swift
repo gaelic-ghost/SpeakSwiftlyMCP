@@ -34,7 +34,7 @@ enum MCPTools {
         ),
         Tool(
             name: "speak_live_background",
-            description: "Queue live speech playback and return once SpeakSwiftly has launched the playback job instead of waiting for playback to finish.",
+            description: "Queue live speech playback and return once SpeakSwiftly has accepted the playback job instead of waiting for playback to finish.",
             inputSchema: [
                 "type": "object",
                 "required": ["text", "profile_name"],

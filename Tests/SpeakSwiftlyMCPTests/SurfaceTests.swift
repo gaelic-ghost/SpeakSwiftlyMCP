@@ -1,4 +1,7 @@
 import Foundation
+import Logging
+import MCP
+import SpeakSwiftlyCore
 import Testing
 @testable import SpeakSwiftlyMCP
 
@@ -46,7 +49,7 @@ func profileSummaryNormalizesSwiftReferenceDateTimestamps() throws {
     }
     """
 
-    let summary = try JSONDecoder().decode(ProfileSummary.self, from: Data(json.utf8))
+    let summary = try JSONDecoder().decode(SpeakSwiftlyMCP.ProfileSummary.self, from: Data(json.utf8))
     #expect(summary.createdAt == "2026-04-02T01:30:12Z")
 }
 
@@ -100,4 +103,42 @@ func runtimeResourceEncodingMatchesPythonRuntimeSummaryShape() throws {
     #expect(object?["mcp_path"] as? String == "/mcp")
     #expect(object?["xcode_build_configuration"] as? String == "Debug")
     #expect(object?["custom_profile_root_configured"] as? Bool == true)
+}
+
+@Test
+func serverMetadataMatchesCurrentSwiftHostContract() async {
+    let owner = SpeakSwiftlyOwner(
+        settings: .fromEnvironment([:]),
+        logger: Logger(label: "SpeakSwiftlyMCPTests"),
+        makeRuntime: { FatalRuntime() }
+    )
+    let server = await MCPServerFactory.buildServer(
+        settings: .fromEnvironment([:]),
+        owner: owner,
+        logger: Logger(label: "SpeakSwiftlyMCPTests")
+    )
+
+    #expect(server.name == "speak-to-user-mcp")
+    #expect(server.version == "0.1.1")
+    #expect(server.instructions?.contains("in-process SpeakSwiftly runtime") == true)
+    #expect(
+        MCPTools.definitions.first(where: { $0.name == "speak_live_background" })?.description
+        == "Queue live speech playback and return once SpeakSwiftly has accepted the playback job instead of waiting for playback to finish."
+    )
+}
+
+private struct FatalRuntime: SpeakSwiftlyRuntimeClient {
+    func runtimeStatusEvents() async -> AsyncStream<SpeakSwiftlyCore.WorkerStatusEvent> {
+        AsyncStream { continuation in
+            continuation.finish()
+        }
+    }
+
+    func runtimeSubmit(_ request: SpeakSwiftlyCore.WorkerRequest) async -> RuntimeRequestHandle {
+        fatalError("Surface metadata test should not submit runtime requests: \(request.opName)")
+    }
+
+    func runtimeStart() async {}
+
+    func runtimeShutdown() async {}
 }
