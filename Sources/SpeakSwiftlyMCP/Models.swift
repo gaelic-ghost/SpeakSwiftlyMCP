@@ -236,14 +236,38 @@ struct QueuedRequestSummary: Hashable, Codable, Sendable {
 struct ListQueueResult: Hashable, Codable, Sendable {
     let id: String
     let ok: Bool
+    let queueType: String
     let activeRequest: ActiveRequestSummary?
     let queue: [QueuedRequestSummary]
 
     enum CodingKeys: String, CodingKey {
         case id
         case ok
+        case queueType = "queue_type"
         case activeRequest = "active_request"
         case queue
+    }
+}
+
+struct PlaybackStateResult: Hashable, Codable, Sendable {
+    let id: String
+    let ok: Bool
+    let playbackState: PlaybackStateResource
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case ok
+        case playbackState = "playback_state"
+    }
+}
+
+struct PlaybackStateResource: Hashable, Codable, Sendable {
+    let state: String
+    let activeRequest: ActiveRequestSummary?
+
+    enum CodingKeys: String, CodingKey {
+        case state
+        case activeRequest = "active_request"
     }
 }
 
@@ -271,12 +295,7 @@ struct CancelRequestResult: Hashable, Codable, Sendable {
     }
 }
 
-struct SpeakLiveResult: Hashable, Codable, Sendable {
-    let id: String
-    let ok: Bool
-}
-
-struct SpeakLiveBackgroundResult: Hashable, Codable, Sendable {
+struct QueueSpeechLiveResult: Hashable, Codable, Sendable {
     let id: String
     let ok: Bool
     let profileName: String

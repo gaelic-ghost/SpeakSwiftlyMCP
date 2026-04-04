@@ -57,7 +57,7 @@ func workerLogEventDecodesSnakeCaseFieldsAndMixedDetailScalars() throws {
       "level": "error",
       "ts": "2026-04-02T01:30:12Z",
       "request_id": "req-123",
-      "op": "speak_live",
+      "op": "queue_speech_live",
       "profile_name": "default-femme",
       "queue_depth": 1,
       "elapsed_ms": 42,
@@ -121,9 +121,10 @@ func queueResultsEncodeSnakeCaseFields() throws {
     let list = ListQueueResult(
         id: "req-list",
         ok: true,
+        queueType: "playback",
         activeRequest: ActiveRequestSummary(
             id: "req-active",
-            op: "speak_live",
+            op: "queue_speech_live",
             profileName: "default-femme"
         ),
         queue: [
@@ -155,9 +156,36 @@ func queueResultsEncodeSnakeCaseFields() throws {
     let activeRequest = listObject?["active_request"] as? [String: Any]
     let queue = listObject?["queue"] as? [[String: Any]]
 
+    #expect(listObject?["queue_type"] as? String == "playback")
     #expect(activeRequest?["profile_name"] as? String == "default-femme")
     #expect(queue?.first?["queue_position"] as? Int == 1)
     #expect(queue?.first?["profile_name"] as? String == "bright-guide")
     #expect(clearObject?["cleared_count"] as? Int == 2)
     #expect(cancelObject?["cancelled_request_id"] as? String == "req-queued")
+}
+
+@Test
+func playbackStateResultEncodesSnakeCaseFields() throws {
+    let result = PlaybackStateResult(
+        id: "req-playback",
+        ok: true,
+        playbackState: PlaybackStateResource(
+            state: "paused",
+            activeRequest: ActiveRequestSummary(
+                id: "req-active",
+                op: "queue_speech_live",
+                profileName: "default-femme"
+            )
+        )
+    )
+
+    let object = try JSONSerialization.jsonObject(
+        with: JSONEncoder().encode(result)
+    ) as? [String: Any]
+    let playbackState = object?["playback_state"] as? [String: Any]
+    let activeRequest = playbackState?["active_request"] as? [String: Any]
+
+    #expect(playbackState?["state"] as? String == "paused")
+    #expect(activeRequest?["op"] as? String == "queue_speech_live")
+    #expect(activeRequest?["profile_name"] as? String == "default-femme")
 }

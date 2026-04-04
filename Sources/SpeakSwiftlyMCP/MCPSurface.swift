@@ -5,12 +5,15 @@ import MCP
 
 enum MCPTools {
     static let toolNames: Set<String> = [
-        "speak_live",
-        "speak_live_background",
+        "queue_speech_live",
         "create_profile",
         "list_profiles",
         "remove_profile",
-        "list_queue",
+        "list_queue_generation",
+        "list_queue_playback",
+        "playback_pause",
+        "playback_resume",
+        "playback_state",
         "clear_queue",
         "cancel_request",
         "status",
@@ -18,26 +21,8 @@ enum MCPTools {
 
     static let definitions: [Tool] = [
         Tool(
-            name: "speak_live",
-            description: "Speak text aloud with a stored SpeakSwiftly profile.",
-            inputSchema: [
-                "type": "object",
-                "required": ["text", "profile_name"],
-                "properties": [
-                    "text": ["type": "string"],
-                    "profile_name": ["type": "string"],
-                ],
-            ],
-            annotations: .init(
-                readOnlyHint: false,
-                destructiveHint: false,
-                idempotentHint: false,
-                openWorldHint: false
-            )
-        ),
-        Tool(
-            name: "speak_live_background",
-            description: "Queue live speech playback and return once SpeakSwiftly has accepted the playback job instead of waiting for playback to finish.",
+            name: "queue_speech_live",
+            description: "Queue live speech playback with a stored SpeakSwiftly profile and return once SpeakSwiftly has accepted the playback job.",
             inputSchema: [
                 "type": "object",
                 "required": ["text", "profile_name"],
@@ -87,8 +72,64 @@ enum MCPTools {
             ]
         ),
         Tool(
-            name: "list_queue",
-            description: "Return the active SpeakSwiftly request plus the currently queued work, if any.",
+            name: "list_queue_generation",
+            description: "Return the active SpeakSwiftly generation request plus the currently queued generation work, if any.",
+            inputSchema: [
+                "type": "object",
+                "properties": [:],
+            ],
+            annotations: .init(
+                readOnlyHint: true,
+                destructiveHint: false,
+                idempotentHint: true,
+                openWorldHint: false
+            )
+        ),
+        Tool(
+            name: "list_queue_playback",
+            description: "Return the active SpeakSwiftly playback request plus the currently queued playback work, if any.",
+            inputSchema: [
+                "type": "object",
+                "properties": [:],
+            ],
+            annotations: .init(
+                readOnlyHint: true,
+                destructiveHint: false,
+                idempotentHint: true,
+                openWorldHint: false
+            )
+        ),
+        Tool(
+            name: "playback_pause",
+            description: "Pause the current SpeakSwiftly playback stream and return the resulting playback state snapshot.",
+            inputSchema: [
+                "type": "object",
+                "properties": [:],
+            ],
+            annotations: .init(
+                readOnlyHint: false,
+                destructiveHint: false,
+                idempotentHint: false,
+                openWorldHint: false
+            )
+        ),
+        Tool(
+            name: "playback_resume",
+            description: "Resume the current SpeakSwiftly playback stream and return the resulting playback state snapshot.",
+            inputSchema: [
+                "type": "object",
+                "properties": [:],
+            ],
+            annotations: .init(
+                readOnlyHint: false,
+                destructiveHint: false,
+                idempotentHint: false,
+                openWorldHint: false
+            )
+        ),
+        Tool(
+            name: "playback_state",
+            description: "Return the current SpeakSwiftly playback state snapshot, including the active playback request when one exists.",
             inputSchema: [
                 "type": "object",
                 "properties": [:],
@@ -197,7 +238,7 @@ enum MCPPromptsCatalog {
         "draft_profile_voice_description",
         "draft_profile_source_text",
         "draft_voice_design_instruction",
-        "draft_background_playback_notice",
+        "draft_queue_playback_notice",
     ]
 
     static let prompts: [Prompt] = [
@@ -237,9 +278,9 @@ enum MCPPromptsCatalog {
             ]
         ),
         Prompt(
-            name: "draft_background_playback_notice",
-            title: "Draft Background Playback Notice",
-            description: "Create a short acknowledgement that spoken playback has been queued in the background and tell the operator where to check job status.",
+            name: "draft_queue_playback_notice",
+            title: "Draft Queued Playback Notice",
+            description: "Create a short acknowledgement that spoken playback has been queued and tell the operator where to check job status.",
             arguments: [
                 .init(name: "spoken_text_summary", required: true),
                 .init(name: "playback_job_id", required: true),

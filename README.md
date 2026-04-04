@@ -15,7 +15,7 @@ Swift executable package that serves `SpeakSwiftly` through a streamable MCP HTT
 
 ## Overview
 
-`SpeakSwiftlyMCP` is the Swift-native sibling to [`speak-to-user-mcp`](https://github.com/gaelic-ghost/speak-to-user-mcp). It keeps the same public MCP tool, prompt, and resource surface while replacing the Python host plus worker subprocess with an in-process `SpeakSwiftlyCore` runtime.
+`SpeakSwiftlyMCP` is the Swift-native sibling to [`speak-to-user-mcp`](https://github.com/gaelic-ghost/speak-to-user-mcp). It mirrors the current `SpeakSwiftly` queue-based speech and playback-control surface while replacing the Python host plus worker subprocess with an in-process `SpeakSwiftlyCore` runtime.
 
 The current server uses [`swift-sdk`](https://github.com/modelcontextprotocol/swift-sdk) for MCP handling and [`Hummingbird`](https://github.com/hummingbird-project/hummingbird) for HTTP serving. By default it binds to `127.0.0.1:7341`, serves MCP at `/mcp`, and exposes a simple health endpoint at `/healthz`.
 
@@ -61,9 +61,9 @@ The Swift host is intentionally small and direct:
 
 Parity notes against `speak-to-user-mcp`:
 
-- The public MCP surface is intentionally mirrored: same tool names, prompt names, resource URIs, and JSON payload shapes.
-- `speak_live_background` now returns after queue acceptance, matching the Python host’s accepted-not-launched wording.
-- The queue-management controls exposed by the current `SpeakSwiftlyCore` runtime are surfaced here too: `list_queue`, `clear_queue`, and `cancel_request`.
+- The public MCP surface is intentionally mirrored to the current `SpeakSwiftly` runtime: queue-based speech, split generation and playback queue inspection, explicit playback controls, and the same operator-readable JSON payload shapes.
+- `queue_speech_live` returns after queue acceptance and keeps the local playback-job tracking resource so operators can follow the request through completion.
+- The queue-management controls exposed by the current `SpeakSwiftlyCore` runtime are surfaced here too: `list_queue_generation`, `list_queue_playback`, `playback_pause`, `playback_resume`, `playback_state`, `clear_queue`, and `cancel_request`.
 - `list_profiles` now returns the cached in-memory snapshot instead of forcing a fresh runtime request on every call, which matches the Python host behavior and the tool description.
 - Late background-playback failures now store the plain worker error message instead of a type-qualified Swift `localizedDescription`.
 
@@ -90,12 +90,15 @@ SPEAK_TO_USER_MCP_E2E=1 swift test
 
 Tool names:
 
-- `speak_live`
-- `speak_live_background`
+- `queue_speech_live`
 - `create_profile`
 - `list_profiles`
 - `remove_profile`
-- `list_queue`
+- `list_queue_generation`
+- `list_queue_playback`
+- `playback_pause`
+- `playback_resume`
+- `playback_state`
 - `clear_queue`
 - `cancel_request`
 - `status`
@@ -105,7 +108,7 @@ Prompt names:
 - `draft_profile_voice_description`
 - `draft_profile_source_text`
 - `draft_voice_design_instruction`
-- `draft_background_playback_notice`
+- `draft_queue_playback_notice`
 
 Resource URIs:
 

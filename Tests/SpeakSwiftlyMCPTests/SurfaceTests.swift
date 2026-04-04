@@ -10,12 +10,15 @@ import Testing
 @Test
 func mirroredToolPromptAndResourceNamesStayStable() {
     #expect(MCPTools.toolNames == [
-        "speak_live",
-        "speak_live_background",
+        "queue_speech_live",
         "create_profile",
         "list_profiles",
         "remove_profile",
-        "list_queue",
+        "list_queue_generation",
+        "list_queue_playback",
+        "playback_pause",
+        "playback_resume",
+        "playback_state",
         "clear_queue",
         "cancel_request",
         "status",
@@ -25,7 +28,7 @@ func mirroredToolPromptAndResourceNamesStayStable() {
         "draft_profile_voice_description",
         "draft_profile_source_text",
         "draft_voice_design_instruction",
-        "draft_background_playback_notice",
+        "draft_queue_playback_notice",
     ])
 
     #expect(Set(MCPResourcesCatalog.resources.map(\.uri)) == [
@@ -122,11 +125,11 @@ func serverMetadataMatchesCurrentSwiftHostContract() async {
     )
 
     #expect(server.name == "speak-to-user-mcp")
-    #expect(server.version == "0.2.0")
-    #expect(server.instructions?.contains("in-process SpeakSwiftly runtime") == true)
+    #expect(server.version == "0.3.0")
+    #expect(server.instructions?.contains("queue-based speech and playback-control tools") == true)
     #expect(
-        MCPTools.definitions.first(where: { $0.name == "speak_live_background" })?.description
-        == "Queue live speech playback and return once SpeakSwiftly has accepted the playback job instead of waiting for playback to finish."
+        MCPTools.definitions.first(where: { $0.name == "queue_speech_live" })?.description
+        == "Queue live speech playback with a stored SpeakSwiftly profile and return once SpeakSwiftly has accepted the playback job."
     )
 }
 

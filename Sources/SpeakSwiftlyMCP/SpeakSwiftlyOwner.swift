@@ -189,27 +189,17 @@ actor SpeakSwiftlyOwner {
 
     // MARK: MCP Operations
 
-    func speakLive(
+    func queueSpeechLive(
         text: String,
         profileName: String,
         onEvent: (@Sendable (WorkerLineEnvelope) async -> Void)? = nil
-    ) async throws -> SpeakLiveResult {
-        let request = WorkerRequest.speakLive(
-            id: UUID().uuidString,
-            text: text,
-            profileName: profileName
-        )
-        let handle = try await submit(request)
-        let success = try await awaitCompletion(for: handle, onEvent: onEvent)
-        return SpeakLiveResult(id: success.id, ok: success.ok)
-    }
-
-    func speakLiveBackground(text: String, profileName: String) async throws -> SpeakLiveBackgroundResult {
+    ) async throws -> QueueSpeechLiveResult {
         let playbackJobID = "playback-\(UUID().uuidString)"
-        let request = WorkerRequest.speakLiveBackground(
+        let request = WorkerRequest.queueSpeech(
             id: playbackJobID,
             text: text,
-            profileName: profileName
+            profileName: profileName,
+            jobType: .live
         )
         let handle = try await submit(request)
 
@@ -233,6 +223,9 @@ actor SpeakSwiftlyOwner {
         let completionWatcher = Task {
             do {
                 for try await event in handle.events {
+                    if let onEvent {
+                        await onEvent(Self.makeWorkerLineEnvelope(from: event))
+                    }
                     self.recordPlaybackEvent(event, playbackJobID: playbackJobID)
 
                     switch event {
@@ -250,6 +243,11 @@ actor SpeakSwiftlyOwner {
                 self.completePlaybackJob(playbackJobID, errorMessage: nil)
                 _ = await enqueueGate.succeed()
             } catch let error as WorkerError {
+                self.appendErrorLog(
+                    event: "request_failed",
+                    message: error.message,
+                    requestID: playbackJobID
+                )
                 let requestError = SpeakSwiftlyOwnerError.requestRejected(
                     code: error.code.rawValue,
                     message: error.message
@@ -258,8 +256,13 @@ actor SpeakSwiftlyOwner {
                     self.completePlaybackJob(playbackJobID, errorMessage: error.message)
                 }
             } catch {
+                self.appendErrorLog(
+                    event: "request_failed",
+                    message: error.localizedDescription,
+                    requestID: playbackJobID
+                )
                 let unavailableError = SpeakSwiftlyOwnerError.workerUnavailable(
-                    "SpeakSwiftly stopped streaming request events before the background playback request could be accepted. \(error.localizedDescription)"
+                    "SpeakSwiftly stopped streaming request events before the queued playback request could be accepted. \(error.localizedDescription)"
                 )
                 if await enqueueGate.fail(unavailableError) == false {
                     self.completePlaybackJob(playbackJobID, errorMessage: error.localizedDescription)
@@ -277,7 +280,7 @@ actor SpeakSwiftlyOwner {
         _ = completionWatcher
 
         let playbackJob = playbackJobsByID[playbackJobID]
-        return SpeakLiveBackgroundResult(
+        return QueueSpeechLiveResult(
             id: playbackJobID,
             ok: true,
             profileName: profileName,
@@ -348,16 +351,38 @@ actor SpeakSwiftlyOwner {
         )
     }
 
-    func listQueue() async throws -> ListQueueResult {
-        let request = WorkerRequest.listQueue(id: UUID().uuidString)
+    func listQueue(_ queueType: WorkerQueueType) async throws -> ListQueueResult {
+        let request = WorkerRequest.listQueue(id: UUID().uuidString, queueType: queueType)
         let handle = try await submit(request)
         let success = try await awaitCompletion(for: handle, onEvent: nil)
 
         return ListQueueResult(
             id: success.id,
             ok: success.ok,
+            queueType: queueType == .generation ? "generation" : "playback",
             activeRequest: success.activeRequest.map(Self.makeActiveRequestSummary),
             queue: (success.queue ?? []).map(Self.makeQueuedRequestSummary)
+        )
+    }
+
+    func playback(_ action: PlaybackAction) async throws -> PlaybackStateResult {
+        let request = WorkerRequest.playback(id: UUID().uuidString, action: action)
+        let handle = try await submit(request)
+        let success = try await awaitCompletion(for: handle, onEvent: nil)
+
+        guard let playbackState = success.playbackState else {
+            throw SpeakSwiftlyOwnerError.invalidWorkerOutput(
+                "SpeakSwiftly completed \(request.opName) without returning the playback state snapshot."
+            )
+        }
+
+        return PlaybackStateResult(
+            id: success.id,
+            ok: success.ok,
+            playbackState: PlaybackStateResource(
+                state: playbackState.state.rawValue,
+                activeRequest: playbackState.activeRequest.map(Self.makeActiveRequestSummary)
+            )
         )
     }
 

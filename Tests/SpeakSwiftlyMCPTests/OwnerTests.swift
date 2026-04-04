@@ -64,7 +64,7 @@ func initializeDegradesWhenProfileRefreshPayloadIsMissing() async {
 }
 
 @Test
-func speakLiveBackgroundTracksCompletionAndRetainsRecentJobsOnly() async throws {
+func queueSpeechLiveTracksCompletionAndRetainsRecentJobsOnly() async throws {
     let profile = SpeakSwiftlyCore.ProfileSummary(
         profileName: "default-femme",
         createdAt: Date(),
@@ -79,7 +79,7 @@ func speakLiveBackgroundTracksCompletionAndRetainsRecentJobsOnly() async throws 
                 request: request,
                 events: [.completed(.init(id: id, profiles: [profile]))]
             )
-        case .speakLiveBackground(let id, _, _):
+        case .queueSpeech(let id, _, _, .live):
             return runtimeHandle(
                 id: id,
                 request: request,
@@ -100,7 +100,7 @@ func speakLiveBackgroundTracksCompletionAndRetainsRecentJobsOnly() async throws 
 
     var firstPlaybackJobID: String?
     for index in 0..<21 {
-        let result = try await owner.speakLiveBackground(
+        let result = try await owner.queueSpeechLive(
             text: "Message \(index) " + String(repeating: "x", count: 120),
             profileName: "default-femme"
         )
@@ -126,7 +126,7 @@ func speakLiveBackgroundTracksCompletionAndRetainsRecentJobsOnly() async throws 
 }
 
 @Test
-func speakLiveForwardsMappedProgressEvents() async throws {
+func queueSpeechLiveForwardsMappedProgressEvents() async throws {
     let profile = SpeakSwiftlyCore.ProfileSummary(
         profileName: "default-femme",
         createdAt: Date(),
@@ -141,7 +141,7 @@ func speakLiveForwardsMappedProgressEvents() async throws {
                 request: request,
                 events: [.completed(.init(id: id, profiles: [profile]))]
             )
-        case .speakLive(let id, _, _):
+        case .queueSpeech(let id, _, _, .live):
             return runtimeHandle(
                 id: id,
                 request: request,
@@ -160,7 +160,7 @@ func speakLiveForwardsMappedProgressEvents() async throws {
     await owner.initialize()
 
     let events = EventRecorder()
-    let result = try await owner.speakLive(
+    let result = try await owner.queueSpeechLive(
         text: "Hello there",
         profileName: "default-femme",
         onEvent: { await events.record($0) }
@@ -170,7 +170,7 @@ func speakLiveForwardsMappedProgressEvents() async throws {
     let recorded = await events.snapshot()
     #expect(recorded.map(\.event).compactMap { $0 } == ["queued", "started", "progress"])
     #expect(recorded.first?.reason == WorkerQueuedReason.waitingForActiveRequest.rawValue)
-    #expect(recorded[1].op == "speak_live")
+    #expect(recorded[1].op == "queue_speech_live")
     #expect(recorded[2].stage == WorkerProgressStage.bufferingAudio.rawValue)
     #expect(recorded.last?.ok == true)
 }
@@ -233,7 +233,7 @@ func queueControlOperationsMirrorCurrentRuntimePayloads() async throws {
                 request: request,
                 events: [.completed(.init(id: id, profiles: [profile]))]
             )
-        case .listQueue(let id):
+        case .listQueue(let id, .generation):
             return runtimeHandle(
                 id: id,
                 request: request,
@@ -243,7 +243,7 @@ func queueControlOperationsMirrorCurrentRuntimePayloads() async throws {
                             id: id,
                             activeRequest: .init(
                                 id: "req-active",
-                                op: "speak_live",
+                                op: "queue_speech_live",
                                 profileName: "default-femme"
                             ),
                             queue: [
@@ -254,6 +254,51 @@ func queueControlOperationsMirrorCurrentRuntimePayloads() async throws {
                                     queuePosition: 1
                                 )
                             ]
+                        )
+                    )
+                ]
+            )
+        case .listQueue(let id, .playback):
+            return runtimeHandle(
+                id: id,
+                request: request,
+                events: [
+                    .completed(
+                        .init(
+                            id: id,
+                            activeRequest: .init(
+                                id: "req-playing",
+                                op: "queue_speech_live",
+                                profileName: "default-femme"
+                            ),
+                            queue: [
+                                .init(
+                                    id: "req-playback-queued",
+                                    op: "queue_speech_live",
+                                    profileName: "bright-guide",
+                                    queuePosition: 1
+                                )
+                            ]
+                        )
+                    )
+                ]
+            )
+        case .playback(let id, .pause):
+            return runtimeHandle(
+                id: id,
+                request: request,
+                events: [
+                    .completed(
+                        .init(
+                            id: id,
+                            playbackState: .init(
+                                state: .paused,
+                                activeRequest: .init(
+                                    id: "req-playing",
+                                    op: "queue_speech_live",
+                                    profileName: "default-femme"
+                                )
+                            )
                         )
                     )
                 ]
@@ -277,11 +322,21 @@ func queueControlOperationsMirrorCurrentRuntimePayloads() async throws {
     let owner = makeOwner(runtime: runtime)
     await owner.initialize()
 
-    let listed = try await owner.listQueue()
-    #expect(listed.activeRequest?.id == "req-active")
-    #expect(listed.activeRequest?.profileName == "default-femme")
-    #expect(listed.queue.count == 1)
-    #expect(listed.queue.first?.queuePosition == 1)
+    let generation = try await owner.listQueue(.generation)
+    #expect(generation.queueType == "generation")
+    #expect(generation.activeRequest?.id == "req-active")
+    #expect(generation.activeRequest?.profileName == "default-femme")
+    #expect(generation.queue.count == 1)
+    #expect(generation.queue.first?.queuePosition == 1)
+
+    let playback = try await owner.listQueue(.playback)
+    #expect(playback.queueType == "playback")
+    #expect(playback.activeRequest?.id == "req-playing")
+    #expect(playback.queue.first?.id == "req-playback-queued")
+
+    let paused = try await owner.playback(.pause)
+    #expect(paused.playbackState.state == "paused")
+    #expect(paused.playbackState.activeRequest?.id == "req-playing")
 
     let cleared = try await owner.clearQueue()
     #expect(cleared.clearedCount == 2)
@@ -341,6 +396,43 @@ func queueControlOperationsRejectMissingResultFieldsClearly() async throws {
 }
 
 @Test
+func playbackControlOperationsRejectMissingStatePayloadClearly() async throws {
+    let profile = SpeakSwiftlyCore.ProfileSummary(
+        profileName: "default-femme",
+        createdAt: Date(),
+        voiceDescription: "Warm narrator",
+        sourceText: "Hello there"
+    )
+    let runtime = FakeRuntime { request in
+        switch request {
+        case .listProfiles(let id):
+            return runtimeHandle(
+                id: id,
+                request: request,
+                events: [.completed(.init(id: id, profiles: [profile]))]
+            )
+        case .playback(let id, .state):
+            return runtimeHandle(
+                id: id,
+                request: request,
+                events: [.completed(.init(id: id))]
+            )
+        default:
+            return runtimeHandle(id: request.id, request: request, events: [])
+        }
+    }
+    let owner = makeOwner(runtime: runtime)
+    await owner.initialize()
+
+    do {
+        _ = try await owner.playback(.state)
+        Issue.record("Expected playback(.state) to reject a completion payload without playback_state.")
+    } catch let error as SpeakSwiftlyOwnerError {
+        #expect(error.errorDescription?.contains("without returning the playback state snapshot") == true)
+    }
+}
+
+@Test
 func statusObservationUpdatesFailureStateFromRuntimeEvents() async throws {
     let profile = SpeakSwiftlyCore.ProfileSummary(
         profileName: "default-femme",
@@ -383,8 +475,8 @@ func speakLiveBeforeInitializationReturnsHelpfulUnavailableError() async {
     let owner = makeOwner(runtime: runtime)
 
     do {
-        _ = try await owner.speakLive(text: "Hello there", profileName: "default-femme")
-        Issue.record("Expected speakLive to fail before runtime initialization.")
+        _ = try await owner.queueSpeechLive(text: "Hello there", profileName: "default-femme")
+        Issue.record("Expected queueSpeechLive to fail before runtime initialization.")
     } catch let error as SpeakSwiftlyOwnerError {
         #expect(error.errorDescription?.contains("not ready yet") == true)
     } catch {
@@ -408,7 +500,7 @@ func speakLiveMapsWorkerErrorsIntoReadableRequestFailures() async throws {
                 request: request,
                 events: [.completed(.init(id: id, profiles: [profile]))]
             )
-        case .speakLive:
+        case .queueSpeech:
             return runtimeThrowingHandle(
                 id: request.id,
                 request: request,
@@ -425,8 +517,8 @@ func speakLiveMapsWorkerErrorsIntoReadableRequestFailures() async throws {
     await owner.initialize()
 
     do {
-        _ = try await owner.speakLive(text: "Hello there", profileName: "default-femme")
-        Issue.record("Expected speakLive to surface a runtime request rejection.")
+        _ = try await owner.queueSpeechLive(text: "Hello there", profileName: "default-femme")
+        Issue.record("Expected queueSpeechLive to surface a runtime request rejection.")
     } catch let error as SpeakSwiftlyOwnerError {
         #expect(error.errorDescription == "SpeakSwiftly could not hand audio to the selected playback device.")
     }
@@ -437,7 +529,7 @@ func speakLiveMapsWorkerErrorsIntoReadableRequestFailures() async throws {
 }
 
 @Test
-func speakLiveBackgroundMarksFailedJobsWhenStreamingBreaks() async throws {
+func queueSpeechLiveMarksFailedJobsWhenStreamingBreaks() async throws {
     let profile = SpeakSwiftlyCore.ProfileSummary(
         profileName: "default-femme",
         createdAt: Date(),
@@ -452,7 +544,7 @@ func speakLiveBackgroundMarksFailedJobsWhenStreamingBreaks() async throws {
                 request: request,
                 events: [.completed(.init(id: id, profiles: [profile]))]
             )
-        case .speakLiveBackground:
+        case .queueSpeech:
             return runtimeThrowingHandle(
                 id: request.id,
                 request: request,
@@ -472,7 +564,7 @@ func speakLiveBackgroundMarksFailedJobsWhenStreamingBreaks() async throws {
     let owner = makeOwner(runtime: runtime)
     await owner.initialize()
 
-    let result = try await owner.speakLiveBackground(
+    let result = try await owner.queueSpeechLive(
         text: "Hello there",
         profileName: "default-femme"
     )
@@ -488,7 +580,7 @@ func speakLiveBackgroundMarksFailedJobsWhenStreamingBreaks() async throws {
 }
 
 @Test
-func speakLiveBackgroundRejectsPreAcceptanceFailuresAndDropsUntrackedJob() async throws {
+func queueSpeechLiveRejectsPreAcceptanceFailuresAndDropsUntrackedJob() async throws {
     let profile = SpeakSwiftlyCore.ProfileSummary(
         profileName: "default-femme",
         createdAt: Date(),
@@ -503,7 +595,7 @@ func speakLiveBackgroundRejectsPreAcceptanceFailuresAndDropsUntrackedJob() async
                 request: request,
                 events: [.completed(.init(id: id, profiles: [profile]))]
             )
-        case .speakLiveBackground:
+        case .queueSpeech:
             return runtimeThrowingHandle(
                 id: request.id,
                 request: request,
@@ -520,7 +612,7 @@ func speakLiveBackgroundRejectsPreAcceptanceFailuresAndDropsUntrackedJob() async
     await owner.initialize()
 
     do {
-        _ = try await owner.speakLiveBackground(
+        _ = try await owner.queueSpeechLive(
             text: "Hello there",
             profileName: "default-femme"
         )

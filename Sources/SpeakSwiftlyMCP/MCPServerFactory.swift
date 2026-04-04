@@ -12,10 +12,10 @@ enum MCPServerFactory {
     ) async -> Server {
         let server = Server(
             name: "speak-to-user-mcp",
-            version: "0.2.0",
+            version: "0.3.0",
             title: "SpeakSwiftlyMCP",
             instructions: """
-            Local speech MCP server that owns an in-process SpeakSwiftly runtime, streams worker progress back to clients, and exposes both blocking and background speech playback tools plus operator-readable status resources.
+            Local speech MCP server that owns an in-process SpeakSwiftly runtime, exposes the current queue-based speech and playback-control tools, streams worker progress back to clients, and publishes operator-readable status resources.
             """,
             capabilities: .init(
                 prompts: .init(listChanged: false),
@@ -32,23 +32,16 @@ enum MCPServerFactory {
             let arguments = params.arguments ?? [:]
 
             switch params.name {
-            case "speak_live":
+            case "queue_speech_live":
                 let progressReporter = makeProgressReporter(
                     server: server,
                     meta: params._meta,
                     logger: logger
                 )
-                let result = try await owner.speakLive(
+                let result = try await owner.queueSpeechLive(
                     text: requiredString("text", in: arguments),
                     profileName: requiredString("profile_name", in: arguments),
                     onEvent: progressReporter
-                )
-                return try toolResult(result)
-
-            case "speak_live_background":
-                let result = try await owner.speakLiveBackground(
-                    text: requiredString("text", in: arguments),
-                    profileName: requiredString("profile_name", in: arguments)
                 )
                 return try toolResult(result)
 
@@ -82,8 +75,20 @@ enum MCPServerFactory {
                 )
                 return try toolResult(result)
 
-            case "list_queue":
-                return try toolResult(try await owner.listQueue())
+            case "list_queue_generation":
+                return try toolResult(try await owner.listQueue(.generation))
+
+            case "list_queue_playback":
+                return try toolResult(try await owner.listQueue(.playback))
+
+            case "playback_pause":
+                return try toolResult(try await owner.playback(.pause))
+
+            case "playback_resume":
+                return try toolResult(try await owner.playback(.resume))
+
+            case "playback_state":
+                return try toolResult(try await owner.playback(.state))
 
             case "clear_queue":
                 return try toolResult(try await owner.clearQueue())
@@ -245,12 +250,12 @@ enum MCPServerFactory {
                     messages: [.user(.text(text: compactPrompt(body)))]
                 )
 
-            case "draft_background_playback_notice":
+            case "draft_queue_playback_notice":
                 let spokenTextSummary = try requiredPromptString("spoken_text_summary", in: arguments)
                 let playbackJobID = try requiredPromptString("playback_job_id", in: arguments)
                 let statusResourceURI = try requiredPromptString("status_resource_uri", in: arguments)
                 let body = """
-                Write exactly one short operator-facing acknowledgement for a speech playback job that was queued in the background.
+                Write exactly one short operator-facing acknowledgement for a speech playback job that was queued.
                 Spoken text summary: \(spokenTextSummary)
                 Playback job id: \(playbackJobID)
                 Status resource URI: \(statusResourceURI)
@@ -258,7 +263,7 @@ enum MCPServerFactory {
                 State that playback was queued, avoid promising that playback has already finished, and point to the status resource for follow-up. Return only the acknowledgement text.
                 """
                 return .init(
-                    description: "Reusable operator-facing prompt for background playback notices.",
+                    description: "Reusable operator-facing prompt for queued playback notices.",
                     messages: [.user(.text(text: compactPrompt(body)))]
                 )
 

@@ -131,46 +131,26 @@ func realServerRunsProfileLifecycleAndPlaybackJobs() async throws {
                 #expect(profileDetail.profileName == profileName)
                 #expect(profileDetail.voiceDescription == "A calm, warm, feminine narrator voice.")
 
-                let speakResult = try await step("run foreground playback tool") {
+                let speakResult = try await step("queue live playback tool") {
                     try await callTool(
-                        "speak_live",
+                        "queue_speech_live",
                         arguments: [
                             "profile_name": .string(profileName),
                             "text": .string("Hello from the real SpeakSwiftly-backed Swift MCP end-to-end path."),
                         ],
                         meta: nil,
                         using: client,
-                        as: SpeakLiveResult.self
+                        as: QueueSpeechLiveResult.self
                     )
                 }
                 #expect(speakResult.ok)
-
-                let backgroundResult = try await step("run background playback tool") {
-                    try await callTool(
-                        "speak_live_background",
-                        arguments: [
-                            "profile_name": .string(profileName),
-                            "text": .string("Hello from the queued background playback path."),
-                        ],
-                        meta: nil,
-                        using: client,
-                        as: SpeakLiveBackgroundResult.self
-                    )
-                }
-                #expect(backgroundResult.ok)
-                #expect(backgroundResult.profileName == profileName)
-                #expect(
-                    backgroundResult.playbackState == "queued"
-                        || backgroundResult.playbackState == "running"
-                        || backgroundResult.playbackState == "completed"
-                )
 
                 let completedPlaybackJob: PlaybackJobResource = try await eventually(
                     timeout: .seconds(30),
                     pollInterval: .milliseconds(250)
                 ) {
                     let job = try await readResource(
-                        backgroundResult.statusResourceURI,
+                        speakResult.statusResourceURI,
                         using: client,
                         as: PlaybackJobResource.self
                     )
@@ -179,7 +159,7 @@ func realServerRunsProfileLifecycleAndPlaybackJobs() async throws {
                     }
                     return job
                 }
-                #expect(completedPlaybackJob.playbackJobID == backgroundResult.playbackJobID)
+                #expect(completedPlaybackJob.playbackJobID == speakResult.playbackJobID)
                 #expect(completedPlaybackJob.lastStage == "completed")
                 #expect(completedPlaybackJob.completedAt != nil)
 
@@ -190,7 +170,7 @@ func realServerRunsProfileLifecycleAndPlaybackJobs() async throws {
                         as: [PlaybackJobResource].self
                     )
                 }
-                #expect(playbackJobs.contains { $0.playbackJobID == backgroundResult.playbackJobID })
+                #expect(playbackJobs.contains { $0.playbackJobID == speakResult.playbackJobID })
 
                 let removeResult = try await step("remove created profile") {
                     try await callTool(
