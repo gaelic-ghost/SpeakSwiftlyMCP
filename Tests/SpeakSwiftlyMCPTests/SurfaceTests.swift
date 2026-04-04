@@ -122,7 +122,7 @@ func serverMetadataMatchesCurrentSwiftHostContract() async {
     )
 
     #expect(server.name == "speak-to-user-mcp")
-    #expect(server.version == "0.1.1")
+    #expect(server.version == "0.2.0")
     #expect(server.instructions?.contains("in-process SpeakSwiftly runtime") == true)
     #expect(
         MCPTools.definitions.first(where: { $0.name == "speak_live_background" })?.description

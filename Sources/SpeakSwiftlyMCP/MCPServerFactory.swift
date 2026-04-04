@@ -12,7 +12,7 @@ enum MCPServerFactory {
     ) async -> Server {
         let server = Server(
             name: "speak-to-user-mcp",
-            version: "0.1.1",
+            version: "0.2.0",
             title: "SpeakSwiftlyMCP",
             instructions: """
             Local speech MCP server that owns an in-process SpeakSwiftly runtime, streams worker progress back to clients, and exposes both blocking and background speech playback tools plus operator-readable status resources.
