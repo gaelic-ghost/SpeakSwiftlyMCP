@@ -348,6 +348,58 @@ actor SpeakSwiftlyOwner {
         )
     }
 
+    func listQueue() async throws -> ListQueueResult {
+        let request = WorkerRequest.listQueue(id: UUID().uuidString)
+        let handle = try await submit(request)
+        let success = try await awaitCompletion(for: handle, onEvent: nil)
+
+        return ListQueueResult(
+            id: success.id,
+            ok: success.ok,
+            activeRequest: success.activeRequest.map(Self.makeActiveRequestSummary),
+            queue: (success.queue ?? []).map(Self.makeQueuedRequestSummary)
+        )
+    }
+
+    func clearQueue() async throws -> ClearQueueResult {
+        let request = WorkerRequest.clearQueue(id: UUID().uuidString)
+        let handle = try await submit(request)
+        let success = try await awaitCompletion(for: handle, onEvent: nil)
+
+        guard let clearedCount = success.clearedCount else {
+            throw SpeakSwiftlyOwnerError.invalidWorkerOutput(
+                "SpeakSwiftly completed clear_queue without returning the cleared request count."
+            )
+        }
+
+        return ClearQueueResult(
+            id: success.id,
+            ok: success.ok,
+            clearedCount: clearedCount
+        )
+    }
+
+    func cancelRequest(_ requestID: String) async throws -> CancelRequestResult {
+        let request = WorkerRequest.cancelRequest(
+            id: UUID().uuidString,
+            requestID: requestID
+        )
+        let handle = try await submit(request)
+        let success = try await awaitCompletion(for: handle, onEvent: nil)
+
+        guard let cancelledRequestID = success.cancelledRequestID else {
+            throw SpeakSwiftlyOwnerError.invalidWorkerOutput(
+                "SpeakSwiftly completed cancel_request without returning the cancelled request id."
+            )
+        }
+
+        return CancelRequestResult(
+            id: success.id,
+            ok: success.ok,
+            cancelledRequestID: cancelledRequestID
+        )
+    }
+
     func status() -> StatusResult {
         let diagnostics = WorkerDiagnosticsSummary(
             lastEvent: workerLogs.last?.event,
@@ -592,6 +644,27 @@ actor SpeakSwiftlyOwner {
             createdAt: iso8601Timestamp(profile.createdAt) ?? "",
             voiceDescription: profile.voiceDescription,
             sourceText: profile.sourceText
+        )
+    }
+
+    private static func makeActiveRequestSummary(
+        _ request: SpeakSwiftlyCore.ActiveWorkerRequestSummary
+    ) -> ActiveRequestSummary {
+        ActiveRequestSummary(
+            id: request.id,
+            op: request.op,
+            profileName: request.profileName
+        )
+    }
+
+    private static func makeQueuedRequestSummary(
+        _ request: SpeakSwiftlyCore.QueuedWorkerRequestSummary
+    ) -> QueuedRequestSummary {
+        QueuedRequestSummary(
+            id: request.id,
+            op: request.op,
+            profileName: request.profileName,
+            queuePosition: request.queuePosition
         )
     }
 

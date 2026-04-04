@@ -15,6 +15,9 @@ func mirroredToolPromptAndResourceNamesStayStable() {
         "create_profile",
         "list_profiles",
         "remove_profile",
+        "list_queue",
+        "clear_queue",
+        "cancel_request",
         "status",
     ])
 

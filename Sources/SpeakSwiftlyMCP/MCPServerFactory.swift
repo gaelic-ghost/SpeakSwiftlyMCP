@@ -82,6 +82,19 @@ enum MCPServerFactory {
                 )
                 return try toolResult(result)
 
+            case "list_queue":
+                return try toolResult(try await owner.listQueue())
+
+            case "clear_queue":
+                return try toolResult(try await owner.clearQueue())
+
+            case "cancel_request":
+                return try toolResult(
+                    try await owner.cancelRequest(
+                        requiredString("request_id", in: arguments)
+                    )
+                )
+
             case "status":
                 return try toolResult(await owner.status())
 

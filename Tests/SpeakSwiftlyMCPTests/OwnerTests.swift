@@ -218,6 +218,129 @@ func createProfileRejectsMissingResultFieldsClearly() async throws {
 }
 
 @Test
+func queueControlOperationsMirrorCurrentRuntimePayloads() async throws {
+    let profile = SpeakSwiftlyCore.ProfileSummary(
+        profileName: "default-femme",
+        createdAt: Date(),
+        voiceDescription: "Warm narrator",
+        sourceText: "Hello there"
+    )
+    let runtime = FakeRuntime { request in
+        switch request {
+        case .listProfiles(let id):
+            return runtimeHandle(
+                id: id,
+                request: request,
+                events: [.completed(.init(id: id, profiles: [profile]))]
+            )
+        case .listQueue(let id):
+            return runtimeHandle(
+                id: id,
+                request: request,
+                events: [
+                    .completed(
+                        .init(
+                            id: id,
+                            activeRequest: .init(
+                                id: "req-active",
+                                op: "speak_live",
+                                profileName: "default-femme"
+                            ),
+                            queue: [
+                                .init(
+                                    id: "req-queued",
+                                    op: "create_profile",
+                                    profileName: "bright-guide",
+                                    queuePosition: 1
+                                )
+                            ]
+                        )
+                    )
+                ]
+            )
+        case .clearQueue(let id):
+            return runtimeHandle(
+                id: id,
+                request: request,
+                events: [.completed(.init(id: id, clearedCount: 2))]
+            )
+        case .cancelRequest(let id, let requestID):
+            return runtimeHandle(
+                id: id,
+                request: request,
+                events: [.completed(.init(id: id, cancelledRequestID: requestID))]
+            )
+        default:
+            return runtimeHandle(id: request.id, request: request, events: [])
+        }
+    }
+    let owner = makeOwner(runtime: runtime)
+    await owner.initialize()
+
+    let listed = try await owner.listQueue()
+    #expect(listed.activeRequest?.id == "req-active")
+    #expect(listed.activeRequest?.profileName == "default-femme")
+    #expect(listed.queue.count == 1)
+    #expect(listed.queue.first?.queuePosition == 1)
+
+    let cleared = try await owner.clearQueue()
+    #expect(cleared.clearedCount == 2)
+
+    let cancelled = try await owner.cancelRequest("req-queued")
+    #expect(cancelled.cancelledRequestID == "req-queued")
+}
+
+@Test
+func queueControlOperationsRejectMissingResultFieldsClearly() async throws {
+    let profile = SpeakSwiftlyCore.ProfileSummary(
+        profileName: "default-femme",
+        createdAt: Date(),
+        voiceDescription: "Warm narrator",
+        sourceText: "Hello there"
+    )
+    let runtime = FakeRuntime { request in
+        switch request {
+        case .listProfiles(let id):
+            return runtimeHandle(
+                id: id,
+                request: request,
+                events: [.completed(.init(id: id, profiles: [profile]))]
+            )
+        case .clearQueue(let id):
+            return runtimeHandle(
+                id: id,
+                request: request,
+                events: [.completed(.init(id: id))]
+            )
+        case .cancelRequest(let id, _):
+            return runtimeHandle(
+                id: id,
+                request: request,
+                events: [.completed(.init(id: id))]
+            )
+        default:
+            return runtimeHandle(id: request.id, request: request, events: [])
+        }
+    }
+    let owner = makeOwner(runtime: runtime)
+    await owner.initialize()
+
+    do {
+        _ = try await owner.clearQueue()
+        Issue.record("Expected clearQueue to reject a completion payload without cleared_count.")
+    } catch let error as SpeakSwiftlyOwnerError {
+        #expect(error.errorDescription?.contains("without returning the cleared request count") == true)
+    }
+
+    do {
+        _ = try await owner.cancelRequest("req-queued")
+        Issue.record("Expected cancelRequest to reject a completion payload without cancelled_request_id.")
+    } catch let error as SpeakSwiftlyOwnerError {
+        #expect(error.errorDescription?.contains("without returning the cancelled request id") == true)
+    }
+}
+
+@Test
 func statusObservationUpdatesFailureStateFromRuntimeEvents() async throws {
     let profile = SpeakSwiftlyCore.ProfileSummary(
         profileName: "default-femme",

@@ -115,3 +115,49 @@ func profileAndPlaybackResourcesEncodeSnakeCaseFields() throws {
     #expect(playbackObject?["playback_state"] as? String == "completed")
     #expect(playbackObject?["text_preview"] as? String == "Hello there")
 }
+
+@Test
+func queueResultsEncodeSnakeCaseFields() throws {
+    let list = ListQueueResult(
+        id: "req-list",
+        ok: true,
+        activeRequest: ActiveRequestSummary(
+            id: "req-active",
+            op: "speak_live",
+            profileName: "default-femme"
+        ),
+        queue: [
+            QueuedRequestSummary(
+                id: "req-queued",
+                op: "create_profile",
+                profileName: "bright-guide",
+                queuePosition: 1
+            )
+        ]
+    )
+    let clear = ClearQueueResult(id: "req-clear", ok: true, clearedCount: 2)
+    let cancel = CancelRequestResult(
+        id: "req-cancel",
+        ok: true,
+        cancelledRequestID: "req-queued"
+    )
+
+    let listObject = try JSONSerialization.jsonObject(
+        with: JSONEncoder().encode(list)
+    ) as? [String: Any]
+    let clearObject = try JSONSerialization.jsonObject(
+        with: JSONEncoder().encode(clear)
+    ) as? [String: Any]
+    let cancelObject = try JSONSerialization.jsonObject(
+        with: JSONEncoder().encode(cancel)
+    ) as? [String: Any]
+
+    let activeRequest = listObject?["active_request"] as? [String: Any]
+    let queue = listObject?["queue"] as? [[String: Any]]
+
+    #expect(activeRequest?["profile_name"] as? String == "default-femme")
+    #expect(queue?.first?["queue_position"] as? Int == 1)
+    #expect(queue?.first?["profile_name"] as? String == "bright-guide")
+    #expect(clearObject?["cleared_count"] as? Int == 2)
+    #expect(cancelObject?["cancelled_request_id"] as? String == "req-queued")
+}

@@ -10,6 +10,9 @@ enum MCPTools {
         "create_profile",
         "list_profiles",
         "remove_profile",
+        "list_queue",
+        "clear_queue",
+        "cancel_request",
         "status",
     ]
 
@@ -82,6 +85,51 @@ enum MCPTools {
                     "profile_name": ["type": "string"],
                 ],
             ]
+        ),
+        Tool(
+            name: "list_queue",
+            description: "Return the active SpeakSwiftly request plus the currently queued work, if any.",
+            inputSchema: [
+                "type": "object",
+                "properties": [:],
+            ],
+            annotations: .init(
+                readOnlyHint: true,
+                destructiveHint: false,
+                idempotentHint: true,
+                openWorldHint: false
+            )
+        ),
+        Tool(
+            name: "clear_queue",
+            description: "Cancel all currently queued SpeakSwiftly requests without interrupting the active request.",
+            inputSchema: [
+                "type": "object",
+                "properties": [:],
+            ],
+            annotations: .init(
+                readOnlyHint: false,
+                destructiveHint: true,
+                idempotentHint: false,
+                openWorldHint: false
+            )
+        ),
+        Tool(
+            name: "cancel_request",
+            description: "Cancel one queued or active SpeakSwiftly request by request id.",
+            inputSchema: [
+                "type": "object",
+                "required": ["request_id"],
+                "properties": [
+                    "request_id": ["type": "string"],
+                ],
+            ],
+            annotations: .init(
+                readOnlyHint: false,
+                destructiveHint: true,
+                idempotentHint: false,
+                openWorldHint: false
+            )
         ),
         Tool(
             name: "status",

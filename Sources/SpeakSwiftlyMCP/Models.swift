@@ -207,6 +207,70 @@ struct ListProfilesResult: Hashable, Codable, Sendable {
     let profiles: [ProfileSummary]
 }
 
+struct ActiveRequestSummary: Hashable, Codable, Sendable {
+    let id: String
+    let op: String
+    let profileName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case op
+        case profileName = "profile_name"
+    }
+}
+
+struct QueuedRequestSummary: Hashable, Codable, Sendable {
+    let id: String
+    let op: String
+    let profileName: String?
+    let queuePosition: Int
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case op
+        case profileName = "profile_name"
+        case queuePosition = "queue_position"
+    }
+}
+
+struct ListQueueResult: Hashable, Codable, Sendable {
+    let id: String
+    let ok: Bool
+    let activeRequest: ActiveRequestSummary?
+    let queue: [QueuedRequestSummary]
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case ok
+        case activeRequest = "active_request"
+        case queue
+    }
+}
+
+struct ClearQueueResult: Hashable, Codable, Sendable {
+    let id: String
+    let ok: Bool
+    let clearedCount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case ok
+        case clearedCount = "cleared_count"
+    }
+}
+
+struct CancelRequestResult: Hashable, Codable, Sendable {
+    let id: String
+    let ok: Bool
+    let cancelledRequestID: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case ok
+        case cancelledRequestID = "cancelled_request_id"
+    }
+}
+
 struct SpeakLiveResult: Hashable, Codable, Sendable {
     let id: String
     let ok: Bool

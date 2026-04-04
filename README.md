@@ -63,6 +63,7 @@ Parity notes against `speak-to-user-mcp`:
 
 - The public MCP surface is intentionally mirrored: same tool names, prompt names, resource URIs, and JSON payload shapes.
 - `speak_live_background` now returns after queue acceptance, matching the Python host’s accepted-not-launched wording.
+- The queue-management controls exposed by the current `SpeakSwiftlyCore` runtime are surfaced here too: `list_queue`, `clear_queue`, and `cancel_request`.
 - `list_profiles` now returns the cached in-memory snapshot instead of forcing a fresh runtime request on every call, which matches the Python host behavior and the tool description.
 - Late background-playback failures now store the plain worker error message instead of a type-qualified Swift `localizedDescription`.
 
@@ -94,6 +95,9 @@ Tool names:
 - `create_profile`
 - `list_profiles`
 - `remove_profile`
+- `list_queue`
+- `clear_queue`
+- `cancel_request`
 - `status`
 
 Prompt names:
