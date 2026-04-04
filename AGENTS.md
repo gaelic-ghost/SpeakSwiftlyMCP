@@ -20,7 +20,9 @@
 
 ## Repository-Specific Workflow
 
-- Treat the standalone `SpeakSwiftlyMCP` repository as the source of truth for package development, tags, and releases.
+- Treat `SpeakSwiftlyMCP` as a retired standalone package.
+- Treat [`../SpeakSwiftlyServer`](../SpeakSwiftlyServer/README.md) as the source of truth for active Swift server, HTTP, MCP, config, and runtime-integration work.
+- Limit work in this repository to deprecation messaging, archival cleanup, release-note maintenance, and narrowly scoped compatibility tasks that Gale explicitly approves.
 - Treat `../speak-to-user/packages/SpeakSwiftlyMCP` as the integration submodule copy once the monorepo adopts it, not the primary development home.
 - Treat the local `../speak-to-user` checkout as a clean base checkout only. It must stay on `main`, and it must stay clean.
 - Never change the local branch of the base `../speak-to-user` checkout for feature work, experiments, release bumps, or submodule updates.

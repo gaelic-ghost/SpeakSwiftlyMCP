@@ -1,6 +1,6 @@
 # SpeakSwiftlyMCP
 
-Swift executable package that serves `SpeakSwiftly` through a streamable MCP HTTP endpoint on macOS.
+Deprecated Swift executable package that previously served `SpeakSwiftly` through a standalone streamable MCP HTTP endpoint on macOS.
 
 ## Table of Contents
 
@@ -15,11 +15,21 @@ Swift executable package that serves `SpeakSwiftly` through a streamable MCP HTT
 
 ## Overview
 
+### Deprecation Notice
+
+`SpeakSwiftlyMCP` is retired in favor of the combined [`SpeakSwiftlyServer`](../SpeakSwiftlyServer/README.md) package.
+
+`SpeakSwiftlyServer` is now the canonical Swift host for both the app-facing HTTP API and the embedded MCP surface. It owns the shared `SpeakSwiftlyCore` runtime, the shared host state model, the shared config model, the shared live-update pipeline, and the current MCP tool, resource, and prompt surface.
+
+No new feature work should land in `SpeakSwiftlyMCP`. Any runtime, MCP, config, transport, or app-integration work should now happen in [`../SpeakSwiftlyServer`](../SpeakSwiftlyServer/README.md).
+
 `SpeakSwiftlyMCP` is the Swift-native sibling to [`speak-to-user-mcp`](https://github.com/gaelic-ghost/speak-to-user-mcp). It mirrors the current `SpeakSwiftly` queue-based speech and playback-control surface while replacing the Python host plus worker subprocess with an in-process `SpeakSwiftlyCore` runtime.
 
 The current server uses [`swift-sdk`](https://github.com/modelcontextprotocol/swift-sdk) for MCP handling and [`Hummingbird`](https://github.com/hummingbird-project/hummingbird) for HTTP serving. By default it binds to `127.0.0.1:7341`, serves MCP at `/mcp`, and exposes a simple health endpoint at `/healthz`.
 
 ## Setup
+
+For new setup, use [`SpeakSwiftlyServer`](../SpeakSwiftlyServer/README.md) instead of this package.
 
 This package currently expects a sibling `SpeakSwiftly` checkout at `../SpeakSwiftly` because the package graph still uses a local path dependency.
 
@@ -38,6 +48,8 @@ swift build
 
 ## Usage
 
+For new local usage, run [`SpeakSwiftlyServer`](../SpeakSwiftlyServer/README.md) instead.
+
 Run the local server with:
 
 ```bash
@@ -50,7 +62,15 @@ Once it is running, the main MCP endpoint is:
 http://127.0.0.1:7341/mcp
 ```
 
+That endpoint remains documented here only for historical compatibility. The actively maintained MCP surface now lives behind `SpeakSwiftlyServer` and its `APP_MCP_*` configuration.
+
 ## Development
+
+This repository is now in retirement mode.
+
+Allowed work here should be limited to deprecation messaging, release notes, archival cleanup, or narrowly scoped compatibility tasks that Gale explicitly chooses to keep alive for a concrete downstream consumer. The source of truth for all active Swift server work is [`SpeakSwiftlyServer`](../SpeakSwiftlyServer/README.md).
+
+The package now builds as an explicit deprecation stub. The older standalone MCP implementation files remain in the repository for historical reference, but they are no longer part of the active SwiftPM target.
 
 The Swift host is intentionally small and direct:
 
@@ -71,6 +91,8 @@ Unlike the Python host, this Swift package does not currently manage a cached Xc
 
 ## Verification
 
+If you are validating current Swift server behavior, prefer verifying [`SpeakSwiftlyServer`](../SpeakSwiftlyServer/README.md) first.
+
 Run the local package checks before committing:
 
 ```bash
@@ -87,6 +109,8 @@ SPEAK_TO_USER_MCP_E2E=1 swift test
 ```
 
 ## MCP Surface
+
+This section is preserved as historical documentation for the retired standalone package. The canonical current MCP surface now lives in [`SpeakSwiftlyServer`](../SpeakSwiftlyServer/README.md).
 
 Tool names:
 
@@ -128,6 +152,8 @@ Privacy defaults:
 - Detailed stored profile content remains behind `speak://profiles/{profile_name}/detail`.
 
 ## Configuration
+
+These environment variables apply only to the retired standalone package. New config work belongs in [`SpeakSwiftlyServer`](../SpeakSwiftlyServer/README.md).
 
 Configuration is environment-driven with the `SPEAK_TO_USER_MCP_` prefix.
 

@@ -1,10 +1,17 @@
 # Project Roadmap
 
-## Vision
+## Retirement Status
+
+- `SpeakSwiftlyMCP` is retired in favor of [`SpeakSwiftlyServer`](../SpeakSwiftlyServer/README.md).
+- This roadmap is preserved as historical context for the standalone package.
+- No new feature milestones should be added here unless Gale explicitly chooses to keep a compatibility-only path alive for a concrete downstream consumer.
+- Active Swift server work now belongs in [`SpeakSwiftlyServer`](../SpeakSwiftlyServer/README.md).
+
+## Historical Vision
 
 - Deliver a Swift-native SpeakSwiftly MCP server that is stable enough for local accessibility workflows and straightforward for a future macOS app to install, supervise, and update as a LaunchAgent.
 
-## Product principles
+## Historical Product Principles
 
 - Keep the MCP surface behavior aligned with `speak-to-user-mcp` while the Swift implementation matures.
 - Prefer simple, directly traceable data flow over speculative architecture.
@@ -19,6 +26,12 @@
 - [x] Milestone 3: `SpeakSwiftlyCore` v1 migration path
 - [ ] Milestone 4: Distributed dependency adoption
 - [ ] Milestone 5: Transport and end-to-end test coverage
+
+## Retirement Outcome
+
+- [x] The shared-host Swift server architecture was completed in `SpeakSwiftlyServer`.
+- [x] The embedded MCP surface in `SpeakSwiftlyServer` replaced the standalone MCP package as the canonical Swift MCP host.
+- [x] New runtime, transport, prompt, resource, and config work now belongs in `SpeakSwiftlyServer` instead of this repository.
 
 ## Milestone 0: Foundation bootstrap
 
