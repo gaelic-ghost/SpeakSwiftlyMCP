@@ -140,11 +140,27 @@ private struct FatalRuntime: SpeakSwiftlyRuntimeClient {
         }
     }
 
-    func runtimeSubmit(_ request: SpeakSwiftlyCore.WorkerRequest) async -> RuntimeRequestHandle {
-        fatalError("Surface metadata test should not submit runtime requests: \(request.opName)")
-    }
+    func runtimeQueueSpeechHandle(text: String, profileName: String, jobType: SpeakSwiftlyCore.SpeechJobType, id: String) async -> RuntimeRequestHandle { fatalUnsupported() }
+
+    func runtimeCreateProfileHandle(profileName: String, text: String, voiceDescription: String, outputPath: String?, id: String) async -> RuntimeRequestHandle { fatalUnsupported() }
+
+    func runtimeListProfilesHandle(id: String) async -> RuntimeRequestHandle { fatalUnsupported() }
+
+    func runtimeRemoveProfileHandle(profileName: String, id: String) async -> RuntimeRequestHandle { fatalUnsupported() }
+
+    func runtimeListQueueHandle(_ queueType: SpeakSwiftlyCore.WorkerQueueType, id: String) async -> RuntimeRequestHandle { fatalUnsupported() }
+
+    func runtimePlaybackHandle(_ action: SpeakSwiftlyCore.PlaybackAction, id: String) async -> RuntimeRequestHandle { fatalUnsupported() }
+
+    func runtimeClearQueueHandle(id: String) async -> RuntimeRequestHandle { fatalUnsupported() }
+
+    func runtimeCancelRequestHandle(requestID: String, id: String) async -> RuntimeRequestHandle { fatalUnsupported() }
 
     func runtimeStart() async {}
 
     func runtimeShutdown() async {}
+
+    private func fatalUnsupported() -> RuntimeRequestHandle {
+        fatalError("Surface metadata test should not submit runtime requests.")
+    }
 }

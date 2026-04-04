@@ -689,13 +689,13 @@ func removeProfileFallsBackToRequestedNameWhenWorkerOmitsIt() async throws {
 // MARK: - Test Helpers
 
 private actor FakeRuntime: SpeakSwiftlyRuntimeClient {
-    private let submitHandler: @Sendable (WorkerRequest) -> RuntimeRequestHandle
+    private let submitHandler: @Sendable (FakeRequest) -> RuntimeRequestHandle
     private var profileSnapshots: [[SpeakSwiftlyCore.ProfileSummary]]
     private var statusContinuations = [AsyncStream<WorkerStatusEvent>.Continuation]()
 
     init(
         profileSnapshots: [[SpeakSwiftlyCore.ProfileSummary]] = [],
-        submitHandler: @escaping @Sendable (WorkerRequest) -> RuntimeRequestHandle
+        submitHandler: @escaping @Sendable (FakeRequest) -> RuntimeRequestHandle
     ) {
         self.profileSnapshots = profileSnapshots
         self.submitHandler = submitHandler
@@ -707,16 +707,64 @@ private actor FakeRuntime: SpeakSwiftlyRuntimeClient {
         }
     }
 
-    func runtimeSubmit(_ request: WorkerRequest) async -> RuntimeRequestHandle {
-        if case .listProfiles(let id) = request, profileSnapshots.isEmpty == false {
+    func runtimeQueueSpeechHandle(
+        text: String,
+        profileName: String,
+        jobType: SpeechJobType,
+        id: String
+    ) async -> RuntimeRequestHandle {
+        submitHandler(.queueSpeech(id: id, text: text, profileName: profileName, jobType: jobType))
+    }
+
+    func runtimeCreateProfileHandle(
+        profileName: String,
+        text: String,
+        voiceDescription: String,
+        outputPath: String?,
+        id: String
+    ) async -> RuntimeRequestHandle {
+        submitHandler(
+            .createProfile(
+                id: id,
+                profileName: profileName,
+                text: text,
+                voiceDescription: voiceDescription,
+                outputPath: outputPath
+            )
+        )
+    }
+
+    func runtimeListProfilesHandle(id: String) async -> RuntimeRequestHandle {
+        if profileSnapshots.isEmpty == false {
             let snapshot = profileSnapshots.removeFirst()
             return runtimeHandle(
                 id: id,
-                request: request,
+                operationName: "list_profiles",
+                profileName: nil,
                 events: [.completed(.init(id: id, profiles: snapshot))]
             )
         }
-        return submitHandler(request)
+        return submitHandler(.listProfiles(id: id))
+    }
+
+    func runtimeRemoveProfileHandle(profileName: String, id: String) async -> RuntimeRequestHandle {
+        submitHandler(.removeProfile(id: id, profileName: profileName))
+    }
+
+    func runtimeListQueueHandle(_ queueType: WorkerQueueType, id: String) async -> RuntimeRequestHandle {
+        submitHandler(.listQueue(id: id, queueType: queueType))
+    }
+
+    func runtimePlaybackHandle(_ action: PlaybackAction, id: String) async -> RuntimeRequestHandle {
+        submitHandler(.playback(id: id, action: action))
+    }
+
+    func runtimeClearQueueHandle(id: String) async -> RuntimeRequestHandle {
+        submitHandler(.clearQueue(id: id))
+    }
+
+    func runtimeCancelRequestHandle(requestID: String, id: String) async -> RuntimeRequestHandle {
+        submitHandler(.cancelRequest(id: id, requestID: requestID))
     }
 
     func runtimeStart() async {}
@@ -750,12 +798,27 @@ private func makeOwner(runtime: any SpeakSwiftlyRuntimeClient) -> SpeakSwiftlyOw
 
 private func runtimeHandle(
     id: String,
-    request: WorkerRequest,
+    request: FakeRequest,
+    events: [WorkerRequestStreamEvent]
+) -> RuntimeRequestHandle {
+    runtimeHandle(
+        id: id,
+        operationName: request.opName,
+        profileName: request.profileName,
+        events: events
+    )
+}
+
+private func runtimeHandle(
+    id: String,
+    operationName: String,
+    profileName: String?,
     events: [WorkerRequestStreamEvent]
 ) -> RuntimeRequestHandle {
     RuntimeRequestHandle(
         id: id,
-        request: request,
+        operationName: operationName,
+        profileName: profileName,
         events: AsyncThrowingStream { continuation in
             events.forEach { continuation.yield($0) }
             continuation.finish()
@@ -765,18 +828,98 @@ private func runtimeHandle(
 
 private func runtimeThrowingHandle(
     id: String,
-    request: WorkerRequest,
+    request: FakeRequest,
+    prefixEvents: [WorkerRequestStreamEvent] = [],
+    error: WorkerError
+) -> RuntimeRequestHandle {
+    runtimeThrowingHandle(
+        id: id,
+        operationName: request.opName,
+        profileName: request.profileName,
+        prefixEvents: prefixEvents,
+        error: error
+    )
+}
+
+private func runtimeThrowingHandle(
+    id: String,
+    operationName: String,
+    profileName: String?,
     prefixEvents: [WorkerRequestStreamEvent] = [],
     error: WorkerError
 ) -> RuntimeRequestHandle {
     RuntimeRequestHandle(
         id: id,
-        request: request,
+        operationName: operationName,
+        profileName: profileName,
         events: AsyncThrowingStream { continuation in
             prefixEvents.forEach { continuation.yield($0) }
             continuation.finish(throwing: error)
         }
     )
+}
+
+private enum FakeRequest: Sendable {
+    case queueSpeech(id: String, text: String, profileName: String, jobType: SpeechJobType)
+    case createProfile(id: String, profileName: String, text: String, voiceDescription: String, outputPath: String?)
+    case listProfiles(id: String)
+    case removeProfile(id: String, profileName: String)
+    case listQueue(id: String, queueType: WorkerQueueType)
+    case playback(id: String, action: PlaybackAction)
+    case clearQueue(id: String)
+    case cancelRequest(id: String, requestID: String)
+
+    var id: String {
+        switch self {
+        case .queueSpeech(let id, _, _, _),
+             .createProfile(let id, _, _, _, _),
+             .listProfiles(let id),
+             .removeProfile(let id, _),
+             .listQueue(let id, _),
+             .playback(let id, _),
+             .clearQueue(let id),
+             .cancelRequest(let id, _):
+            return id
+        }
+    }
+
+    var opName: String {
+        switch self {
+        case .queueSpeech(_, _, _, .live):
+            return "queue_speech_live"
+        case .createProfile:
+            return "create_profile"
+        case .listProfiles:
+            return "list_profiles"
+        case .removeProfile:
+            return "remove_profile"
+        case .listQueue(_, .generation):
+            return "list_queue_generation"
+        case .listQueue(_, .playback):
+            return "list_queue_playback"
+        case .playback(_, .pause):
+            return "playback_pause"
+        case .playback(_, .resume):
+            return "playback_resume"
+        case .playback(_, .state):
+            return "playback_state"
+        case .clearQueue:
+            return "clear_queue"
+        case .cancelRequest:
+            return "cancel_request"
+        }
+    }
+
+    var profileName: String? {
+        switch self {
+        case .queueSpeech(_, _, let profileName, _),
+             .createProfile(_, let profileName, _, _, _),
+             .removeProfile(_, let profileName):
+            return profileName
+        case .listProfiles, .listQueue, .playback, .clearQueue, .cancelRequest:
+            return nil
+        }
+    }
 }
 
 private func eventually(

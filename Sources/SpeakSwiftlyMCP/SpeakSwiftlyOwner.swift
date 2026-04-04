@@ -6,14 +6,33 @@ import SpeakSwiftlyCore
 
 protocol SpeakSwiftlyRuntimeClient: Sendable {
     func runtimeStatusEvents() async -> AsyncStream<WorkerStatusEvent>
-    func runtimeSubmit(_ request: WorkerRequest) async -> RuntimeRequestHandle
+    func runtimeQueueSpeechHandle(
+        text: String,
+        profileName: String,
+        jobType: SpeechJobType,
+        id: String
+    ) async -> RuntimeRequestHandle
+    func runtimeCreateProfileHandle(
+        profileName: String,
+        text: String,
+        voiceDescription: String,
+        outputPath: String?,
+        id: String
+    ) async -> RuntimeRequestHandle
+    func runtimeListProfilesHandle(id: String) async -> RuntimeRequestHandle
+    func runtimeRemoveProfileHandle(profileName: String, id: String) async -> RuntimeRequestHandle
+    func runtimeListQueueHandle(_ queueType: WorkerQueueType, id: String) async -> RuntimeRequestHandle
+    func runtimePlaybackHandle(_ action: PlaybackAction, id: String) async -> RuntimeRequestHandle
+    func runtimeClearQueueHandle(id: String) async -> RuntimeRequestHandle
+    func runtimeCancelRequestHandle(requestID: String, id: String) async -> RuntimeRequestHandle
     func runtimeStart() async
     func runtimeShutdown() async
 }
 
 struct RuntimeRequestHandle: Sendable {
     let id: String
-    let request: WorkerRequest
+    let operationName: String
+    let profileName: String?
     let events: AsyncThrowingStream<WorkerRequestStreamEvent, Error>
 }
 
@@ -22,11 +41,104 @@ extension WorkerRuntime: SpeakSwiftlyRuntimeClient {
         statusEvents()
     }
 
-    func runtimeSubmit(_ request: WorkerRequest) async -> RuntimeRequestHandle {
-        let handle = await submit(request)
+    func runtimeQueueSpeechHandle(
+        text: String,
+        profileName: String,
+        jobType: SpeechJobType,
+        id: String
+    ) async -> RuntimeRequestHandle {
+        let handle = await queueSpeechHandle(
+            text: text,
+            profileName: profileName,
+            as: jobType,
+            id: id
+        )
         return RuntimeRequestHandle(
             id: handle.id,
-            request: handle.request,
+            operationName: handle.operationName,
+            profileName: handle.profileName,
+            events: handle.events
+        )
+    }
+
+    func runtimeCreateProfileHandle(
+        profileName: String,
+        text: String,
+        voiceDescription: String,
+        outputPath: String?,
+        id: String
+    ) async -> RuntimeRequestHandle {
+        let handle = await createProfileHandle(
+            profileName: profileName,
+            text: text,
+            voiceDescription: voiceDescription,
+            outputPath: outputPath,
+            id: id
+        )
+        return RuntimeRequestHandle(
+            id: handle.id,
+            operationName: handle.operationName,
+            profileName: handle.profileName,
+            events: handle.events
+        )
+    }
+
+    func runtimeListProfilesHandle(id: String) async -> RuntimeRequestHandle {
+        let handle = await listProfilesHandle(id: id)
+        return RuntimeRequestHandle(
+            id: handle.id,
+            operationName: handle.operationName,
+            profileName: handle.profileName,
+            events: handle.events
+        )
+    }
+
+    func runtimeRemoveProfileHandle(profileName: String, id: String) async -> RuntimeRequestHandle {
+        let handle = await removeProfileHandle(profileName: profileName, id: id)
+        return RuntimeRequestHandle(
+            id: handle.id,
+            operationName: handle.operationName,
+            profileName: handle.profileName,
+            events: handle.events
+        )
+    }
+
+    func runtimeListQueueHandle(_ queueType: WorkerQueueType, id: String) async -> RuntimeRequestHandle {
+        let handle = await listQueueHandle(queueType, id: id)
+        return RuntimeRequestHandle(
+            id: handle.id,
+            operationName: handle.operationName,
+            profileName: handle.profileName,
+            events: handle.events
+        )
+    }
+
+    func runtimePlaybackHandle(_ action: PlaybackAction, id: String) async -> RuntimeRequestHandle {
+        let handle = await playbackHandle(action, id: id)
+        return RuntimeRequestHandle(
+            id: handle.id,
+            operationName: handle.operationName,
+            profileName: handle.profileName,
+            events: handle.events
+        )
+    }
+
+    func runtimeClearQueueHandle(id: String) async -> RuntimeRequestHandle {
+        let handle = await clearQueueHandle(id: id)
+        return RuntimeRequestHandle(
+            id: handle.id,
+            operationName: handle.operationName,
+            profileName: handle.profileName,
+            events: handle.events
+        )
+    }
+
+    func runtimeCancelRequestHandle(requestID: String, id: String) async -> RuntimeRequestHandle {
+        let handle = await cancelRequestHandle(with: requestID, requestID: id)
+        return RuntimeRequestHandle(
+            id: handle.id,
+            operationName: handle.operationName,
+            profileName: handle.profileName,
             events: handle.events
         )
     }
@@ -195,13 +307,12 @@ actor SpeakSwiftlyOwner {
         onEvent: (@Sendable (WorkerLineEnvelope) async -> Void)? = nil
     ) async throws -> QueueSpeechLiveResult {
         let playbackJobID = "playback-\(UUID().uuidString)"
-        let request = WorkerRequest.queueSpeech(
-            id: playbackJobID,
+        let handle = try await submitQueueSpeech(
             text: text,
             profileName: profileName,
-            jobType: .live
+            jobType: .live,
+            id: playbackJobID
         )
-        let handle = try await submit(request)
 
         let acceptedAt = Date()
         playbackJobsByID[playbackJobID] = PlaybackJob(
@@ -300,14 +411,13 @@ actor SpeakSwiftlyOwner {
         outputPath: String?,
         onEvent: (@Sendable (WorkerLineEnvelope) async -> Void)? = nil
     ) async throws -> CreateProfileResult {
-        let request = WorkerRequest.createProfile(
-            id: UUID().uuidString,
+        let handle = try await submitCreateProfile(
             profileName: profileName,
             text: text,
             voiceDescription: voiceDescription,
-            outputPath: outputPath
+            outputPath: outputPath,
+            id: UUID().uuidString
         )
-        let handle = try await submit(request)
         let success = try await awaitCompletion(for: handle, onEvent: onEvent)
         try await refreshProfiles()
 
@@ -336,11 +446,10 @@ actor SpeakSwiftlyOwner {
         profileName: String,
         onEvent: (@Sendable (WorkerLineEnvelope) async -> Void)? = nil
     ) async throws -> RemoveProfileResult {
-        let request = WorkerRequest.removeProfile(
-            id: UUID().uuidString,
-            profileName: profileName
+        let handle = try await submitRemoveProfile(
+            profileName: profileName,
+            id: UUID().uuidString
         )
-        let handle = try await submit(request)
         let success = try await awaitCompletion(for: handle, onEvent: onEvent)
         try await refreshProfiles()
 
@@ -352,8 +461,7 @@ actor SpeakSwiftlyOwner {
     }
 
     func listQueue(_ queueType: WorkerQueueType) async throws -> ListQueueResult {
-        let request = WorkerRequest.listQueue(id: UUID().uuidString, queueType: queueType)
-        let handle = try await submit(request)
+        let handle = try await submitListQueue(queueType, id: UUID().uuidString)
         let success = try await awaitCompletion(for: handle, onEvent: nil)
 
         return ListQueueResult(
@@ -366,13 +474,12 @@ actor SpeakSwiftlyOwner {
     }
 
     func playback(_ action: PlaybackAction) async throws -> PlaybackStateResult {
-        let request = WorkerRequest.playback(id: UUID().uuidString, action: action)
-        let handle = try await submit(request)
+        let handle = try await submitPlayback(action, id: UUID().uuidString)
         let success = try await awaitCompletion(for: handle, onEvent: nil)
 
         guard let playbackState = success.playbackState else {
             throw SpeakSwiftlyOwnerError.invalidWorkerOutput(
-                "SpeakSwiftly completed \(request.opName) without returning the playback state snapshot."
+                "SpeakSwiftly completed \(handle.operationName) without returning the playback state snapshot."
             )
         }
 
@@ -387,8 +494,7 @@ actor SpeakSwiftlyOwner {
     }
 
     func clearQueue() async throws -> ClearQueueResult {
-        let request = WorkerRequest.clearQueue(id: UUID().uuidString)
-        let handle = try await submit(request)
+        let handle = try await submitClearQueue(id: UUID().uuidString)
         let success = try await awaitCompletion(for: handle, onEvent: nil)
 
         guard let clearedCount = success.clearedCount else {
@@ -405,11 +511,10 @@ actor SpeakSwiftlyOwner {
     }
 
     func cancelRequest(_ requestID: String) async throws -> CancelRequestResult {
-        let request = WorkerRequest.cancelRequest(
-            id: UUID().uuidString,
-            requestID: requestID
+        let handle = try await submitCancelRequest(
+            requestID,
+            id: UUID().uuidString
         )
-        let handle = try await submit(request)
         let success = try await awaitCompletion(for: handle, onEvent: nil)
 
         guard let cancelledRequestID = success.cancelledRequestID else {
@@ -518,8 +623,7 @@ actor SpeakSwiftlyOwner {
     }
 
     private func refreshProfiles() async throws {
-        let request = WorkerRequest.listProfiles(id: UUID().uuidString)
-        let handle = try await submit(request)
+        let handle = try await submitListProfiles(id: UUID().uuidString)
         let success = try await awaitCompletion(for: handle, onEvent: nil)
 
         guard let importedProfiles = success.profiles else {
@@ -534,14 +638,75 @@ actor SpeakSwiftlyOwner {
         profileCacheWarning = nil
     }
 
-    private func submit(_ request: WorkerRequest) async throws -> RuntimeRequestHandle {
+    private func ensureRuntimeReady() throws -> any SpeakSwiftlyRuntimeClient {
         guard let runtime else {
             throw SpeakSwiftlyOwnerError.workerUnavailable(
                 "SpeakSwiftly is not ready yet. Wait for initialization to finish or inspect the status tool for details."
             )
         }
+        return runtime
+    }
 
-        return await runtime.runtimeSubmit(request)
+    private func submitQueueSpeech(
+        text: String,
+        profileName: String,
+        jobType: SpeechJobType,
+        id: String
+    ) async throws -> RuntimeRequestHandle {
+        let runtime = try ensureRuntimeReady()
+        return await runtime.runtimeQueueSpeechHandle(
+            text: text,
+            profileName: profileName,
+            jobType: jobType,
+            id: id
+        )
+    }
+
+    private func submitCreateProfile(
+        profileName: String,
+        text: String,
+        voiceDescription: String,
+        outputPath: String?,
+        id: String
+    ) async throws -> RuntimeRequestHandle {
+        let runtime = try ensureRuntimeReady()
+        return await runtime.runtimeCreateProfileHandle(
+            profileName: profileName,
+            text: text,
+            voiceDescription: voiceDescription,
+            outputPath: outputPath,
+            id: id
+        )
+    }
+
+    private func submitListProfiles(id: String) async throws -> RuntimeRequestHandle {
+        let runtime = try ensureRuntimeReady()
+        return await runtime.runtimeListProfilesHandle(id: id)
+    }
+
+    private func submitRemoveProfile(profileName: String, id: String) async throws -> RuntimeRequestHandle {
+        let runtime = try ensureRuntimeReady()
+        return await runtime.runtimeRemoveProfileHandle(profileName: profileName, id: id)
+    }
+
+    private func submitListQueue(_ queueType: WorkerQueueType, id: String) async throws -> RuntimeRequestHandle {
+        let runtime = try ensureRuntimeReady()
+        return await runtime.runtimeListQueueHandle(queueType, id: id)
+    }
+
+    private func submitPlayback(_ action: PlaybackAction, id: String) async throws -> RuntimeRequestHandle {
+        let runtime = try ensureRuntimeReady()
+        return await runtime.runtimePlaybackHandle(action, id: id)
+    }
+
+    private func submitClearQueue(id: String) async throws -> RuntimeRequestHandle {
+        let runtime = try ensureRuntimeReady()
+        return await runtime.runtimeClearQueueHandle(id: id)
+    }
+
+    private func submitCancelRequest(_ requestID: String, id: String) async throws -> RuntimeRequestHandle {
+        let runtime = try ensureRuntimeReady()
+        return await runtime.runtimeCancelRequestHandle(requestID: requestID, id: id)
     }
 
     private func ensureWorkerReady() throws {
